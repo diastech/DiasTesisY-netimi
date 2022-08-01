@@ -1,6 +1,0 @@
-var listItems = e.component.content().find(".dx-list-item");
-        console.log(listItems[0]);
-        listItems[0].id = "priorityOne";
-        console.log(listItems[0]);
-        listItems[1].css("background-color", "yellow");
-        listItems[2].css("background-color", "blue");

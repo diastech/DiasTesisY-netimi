@@ -1,3 +1,0 @@
-C:\Users\sguzel\source\repos\DiasFacilityManagement\DIAS.UI\wwwroot\fileUploads
-
-C:\Users\sguzel\source\repos\DiasFacilityManagement\DiasProjects\wwwroot\fileUploads
