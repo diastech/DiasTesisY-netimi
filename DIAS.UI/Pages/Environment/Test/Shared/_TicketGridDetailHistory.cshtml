@@ -1,0 +1,34 @@
+﻿@{
+    var webApiVUrl = Configuration.GetValue<string>("WebApiVUrl");
+}
+
+@(Html.DevExtreme().Form()
+    .ElementAttr("class", "form-container")
+    .FormData(new JS("tabHistory"))
+    .LabelLocation(FormLabelLocation.Top)
+    .Items(items => {
+        items.AddSimple().Template(@<text>
+            @(Html.DevExtreme().List()
+                .ID(new JS("'ticketHistory-' + component.option('formData').id"))
+                //.Height("100%")
+                .AllowItemDeleting(false)
+                .KeyExpr("id")
+                .DisplayExpr(new JS("Shared.ticketHistoryDisplayExpr"))
+                .DataSource(new JS("Tickets.gridTicketHistoryDataSource(component.option('formData').id)"))
+            //.DataSource(d => d.RemoteController().LoadUrl(webApiVUrl + "TicketHistory/GetAllTicketHistoryVwByTicketId")
+            //    .OnBeforeSend("Shared.beforeSend")
+            //    .OnLoaded("Shared.ticketHistoryOnLoading")
+            //    .LoadMode(DataSourceLoadMode.Raw)
+            //    .LoadParams(new
+            //    {
+            //        ticketId = new JS("function() { return component.option('formData').id; }")
+            //    }
+            //))
+            )
+        </text>);
+   })
+)
+
+<script>
+
+</script>

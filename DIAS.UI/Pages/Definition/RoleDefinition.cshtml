@@ -1,0 +1,518 @@
+﻿
+@page
+@model DIAS.UI.Pages.Definition.RoleHelperModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@using DIAS.UI.Helpers
+@{
+}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/3.8.0/exceljs.min.js" defer></script>
+<script src="~/js/pages/shared/reason.js"></script>
+<div class="card">
+
+    <div class="card-body">
+
+        @(Html.DevExtreme().DataGrid<RoleHelperDto>()
+                            .ID("gridroleDefinition")
+                            .DataSource(ds => ds.RemoteController()
+                            .OnBeforeSend("beforeSendRoleDefinition")
+                            .Key("Id")
+                            .LoadUrl(Url.Page(null, "GridData"))
+                            //.InsertUrl(Url.Page(null, "GridRow"))
+                            //.UpdateUrl(Url.Page(null, "GridRowUpdate"))
+                            //.DeleteUrl(Url.Page(null, "GridRowDelete"))
+                        )
+                            .Export(o => o.Enabled(true).AllowExportSelectedData(true))
+                            .OnExporting("RoleDefinitionGridDataExporting")
+                            .ColumnChooser(c => c.Enabled(true).AllowSearch(true).Mode(GridColumnChooserMode.Select))
+                            .HeaderFilter(o=>o.AllowSearch(true))
+                            .FilterRow(o => o.Visible(true))
+                            .Selection(s => s.Mode(SelectionMode.Single))
+                            .OnSelectionChanged("onSelectionChangedRoleDefinition")
+                            .OnToolbarPreparing("onToolbarPreparingRoleDefinition")
+                            .OnCellPrepared("onCellPreparedRoleDefinition")
+                        .RemoteOperations(true)
+                            .ShowBorders(true)
+                            .Paging(p => p.Enabled(false))
+                        .Editing(e => e.Mode(GridEditMode.Popup)
+                                .AllowUpdating(true)
+                                .AllowDeleting(true)
+                                .AllowAdding(true)
+                                .SelectTextOnEditStart(true)
+                                .StartEditAction(GridStartEditAction.DblClick)
+                                .Popup(p => p
+                                    .Title("Rol Tanımlama")
+                                    .ID("popupRoleDefinitionContainer")
+                                    .ShowTitle(true)
+                                    .Width(700)
+                                    .OnShowing("setPopupTitleRoleDefinition")
+                                    .ShowCloseButton(false)
+                                )
+                            .Form(f => f.Items(items =>
+                            {
+                                items.AddGroup()
+                                    .Items(groupItems =>
+                                    {
+                                    groupItems.AddTabbed()
+                    .TabPanelOptions(o =>
+                    {
+                        o.DeferRendering(false);
+                        o.AnimationEnabled(true);
+                        o.ID("RoleDefinitionTab");
+                        o.Width(650);
+                        o.AnimationEnabled(true);
+                        o.ShowNavButtons(true);
+                        o.Height("100%");
+                    })
+                    .Tabs(tabItems =>
+                    {
+                    tabItems.Add().Icon("fas fa-save")
+                    .Title("Rol Tanımı").ColCount(2)
+                    .Items(tabItem =>
+                    {
+                        tabItem.AddSimpleFor(m => m.Name).Label(l => l.Text("Rol İsmi")).ColSpan(2).Editor(ed => ed.TextBox().ID("roleDefinition")
+                          .Placeholder("Rol İsmi Giriniz")).ValidationRules(v =>
+                          {
+                              v.AddRequired().Message("Rol İsmi Alanı Zorunludur.");
+                          });
+
+                        tabItem.AddButton().ColSpan(2)
+                        .HorizontalAlignment(HorizontalAlignment.Left)
+                        .ButtonOptions(b => b.Text("Vaka Nedeni").ID("btnReason")
+                        .Type(ButtonType.Success)
+                        .OnClick("onClickButtonOpenPopupReason")
+                        .UseSubmitBehavior(true));
+
+                        tabItem.AddButton().ColSpan(2)
+                        .HorizontalAlignment(HorizontalAlignment.Left)
+                        .ButtonOptions(b => b.Text("Yetki Mahal").ID("btnLocation")
+                        .Type(ButtonType.Success)
+                        .OnClick("onClickButtonOpenPopupLocation")
+                        .UseSubmitBehavior(true));
+
+                        tabItem.AddSimpleFor(m => m.ActiveStatus).Label(l => l.Text("Aktif")).ColSpan(1).Editor(ed => ed.CheckBox().Value(true).ID("roleDefinitionActiveStatus"));
+                    });
+                    });
+                                });
+                            }).ID("roleDefinitionForm")))
+        .Columns(columns =>
+        {
+
+
+        })
+        .OnEditingStart(@<text> function(e) {onEditingStartRoleDefinition(e) } </text>)
+        .OnInitNewRow(@<text> function(e) { onInitNewRowRoleDefinition(e); } </text>)
+
+    )
+    </div>
+</div>
+
+@using (Html.DevExtreme().NamedTemplate("ReasonTemplate"))
+{
+    <div style="display:flex">
+        <div class="col-md-6">
+            @await Html.PartialAsync("../Shared/_MultipleReasonTreeView")
+        </div>
+        <div class="col-md-5">
+            @await Html.PartialAsync("../Shared/_ReasonDragging", "SelectedReasons")
+        </div>
+    </div>
+
+}
+
+@using (Html.DevExtreme().NamedTemplate("LocationTemplate"))
+{
+    <div style="display:flex">
+        <div class="col-md-6">
+            @await Html.PartialAsync("../Shared/_MultipleLocationTreeView")
+        </div>
+        <div class="col-md-5">
+            @await Html.PartialAsync("../Shared/_LocationDragging", "SelectedLocations")
+        </div>
+    </div>
+}
+
+@(Html.DevExtreme().Popup()
+    .ID("popupReason")
+    .Visible(false)
+    .ShowTitle(false)
+    .ShowCloseButton(true)
+)
+@(Html.DevExtreme().Popup()
+    .ID("popupLocation")
+    .Visible(false)
+    .ShowTitle(false)
+    .ShowCloseButton(true)
+)
+
+
+
+<script type="text/javascript">
+    var data;
+    var listReason = [];
+    var listLocation = [];
+    var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+    function onEditingStartRoleDefinition(e) {
+        data = e.data;
+    }
+    function onInitNewRowRoleDefinition(e) {
+        data = null;
+    }
+    function onToolbarPreparingRoleDefinition(e) {
+        e.toolbarOptions.items[0].showText = "always";
+        e.toolbarOptions.items[0].options.text = "Rol Ekle";
+        e.toolbarOptions.items[0].options.icon = "plus";
+        e.toolbarOptions.items[0].options.type = "success";
+    }
+    function onSelectionChangedRoleDefinition(data) {
+        let rowData = data.selectedRowsData[0];
+        if (!rowData)
+            return;
+        dataRow = rowData;
+    }
+    function setPopupTitleRoleDefinition(e) {
+        $("#popupRoleDefinitionContainer").dxPopup("instance").option("height", "40%");
+        $("#popupRoleDefinitionContainer").dxPopup("instance").option("toolbarItems[0].toolbar", "top");
+        $("#popupRoleDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.icon", "save");
+        $("#popupRoleDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.type", "success");
+        $("#popupRoleDefinitionContainer").dxPopup("instance").option("toolbarItems[1].toolbar", "top");
+        $("#popupRoleDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.text", "Kapat");
+        $("#popupRoleDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.icon", "close");
+        $("#popupRoleDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.type", "default");
+        $(".dx-toolbar-before").children().css("width", "250");
+        $(".dx-toolbar-before").children().children().children().prepend("<i class='fas fa-user-shield' style='padding-right:6px;'></i>");        
+        var btnReason = $("#btnReason").parent();
+        btnReason.prepend("<label class='dx-field-item-label dx-field-item-label-location-left' style='padding-right: 21px;'><span class='dx-field-item-label-content' style='width: 61px;'><span class='dx-field-item-label-text'>Vaka Nedeni:</span><span class='dx-field-item-required-mark'>&nbsp;*</span></span></label>");
+        var btnLocatipn = $("#btnLocation").parent();
+        btnLocatipn.prepend("<label class='dx-field-item-label dx-field-item-label-location-left' style='padding-right: 21px;'><span class='dx-field-item-label-content' style='width: 61px;'><span class='dx-field-item-label-text'>Yetkili Mahal:</span><span class='dx-field-item-required-mark'>&nbsp;*</span></span></label>");
+        $("#roleDefinition").parent()[0].previousSibling.style.cssText = "padding-right:49px";
+        $("#roleDefinitionActiveStatus").parent()[0].previousSibling.style.cssText = "padding-right:49px";
+
+        if (data == null) {
+            
+        }
+        if (data != null) {
+            $("#popupRoleDefinitionContainer").dxPopup({
+                title: "Rol Düzenle",
+            });
+            $("#popupRoleDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.text", "Güncelle");
+        }
+    }
+    function beforeSendRoleDefinition(type, e) {
+        if (type == "load") return;
+        if (type == "update")
+        {
+
+            var formData = new FormData();
+
+            formData.append("Id", data.Id);
+            formData.append("AddedTime", data.AddedTime);
+            formData.append("IsDeleted", data.IsDeleted);
+            formData.append("IsActive", data.IsActive);
+            formData.append("TcNo", TcNo);
+            formData.append("Name", Name);
+            formData.append("Surname", Surname);
+            formData.append("UserName", UserName);
+            formData.append("Password", Password);
+            formData.append("RoleHelperId", RoleHelperId);
+            formData.append("PhoneNumber", PhoneNumber);
+            formData.append("ActiveStatus", ActiveStatus);
+
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+        if (type == "insert")
+        {
+            var formData = new FormData();
+            formData.append("TcNo", TcNo);
+            formData.append("Name", Name);
+            formData.append("Surname", Surname);
+            formData.append("UserName", UserName);
+            formData.append("Password", Password);
+            formData.append("RoleHelperId", RoleHelperId);
+            formData.append("PhoneNumber", PhoneNumber);
+            formData.append("ActiveStatus", ActiveStatus);
+
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+        if (type == "delete")
+        {
+            var Id = e.data.key;
+            var ajaxHeader = {};
+            ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+            var formData = new FormData();
+            formData.append("Id", Id);
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+    }
+    function RoleDefinitionGridDataExporting(e){
+        let workbook = new ExcelJS.Workbook();
+        let worksheet = workbook.addWorksheet('RoleDefinition');
+
+        DevExpress.excelExporter.exportDataGrid({
+            component: e.component,
+            worksheet: worksheet,
+            autoFilterEnabled: true
+        }).then(function () {
+            workbook.xlsx.writeBuffer().then(function (buffer) {
+                saveAs(new Blob([buffer], { type: 'application/octet-stream' }), 'Tesisler.xlsx');
+            });
+        });
+        e.cancel = true;
+    }
+    function onCellPreparedRoleDefinition(e) {
+        if (e.column.type == "buttons") {
+            e.cellElement.children().removeClass('dx-icon-edit').addClass("dx-icon-search");
+            e.cellElement.children().attr("title", "Detay");
+        }
+    }
+
+    $(function () {
+        $("#popupReason").dxPopup({
+            title: "Kişiye Ata",
+            contentTemplate: ReasonTemplate,
+            showCloseButton: true,
+            width: 1000,
+            height: 500,
+            toolbarItems: [{
+                text: "Kişi Seç",
+                location: "before"
+            },
+            {
+                widget: "dxButton",
+                toolbar: 'top',
+                location: "after",
+                options: {
+                    type: 'success',
+                    text: "Kaydet",
+                    icon: "save",
+                    onClick: function (e) {
+                        @*var userId = $("#assignedUser").dxDropDownBox("instance").option("value");
+                        var ticketId = dataRow.Id;
+                        if (ticketId != null) {
+                            ticketId = dataRow.Id;
+                        }
+                        var ajaxHeader = {};
+                        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+                        $.ajax({
+                            type: "POST",
+                            url: "Tickets?handler=ChangeTicketState",
+                            headers: ajaxHeader,
+                            data: { "Id": ticketStateId, "ticketStateId": ticketStatusId, "stringUserId": userId[0], "ticketId": ticketId },
+                            async: true,
+                            success: function (response) {
+                                $("#popupAssignedUser").dxPopup("hide");
+                                $("#popupContainer").dxPopup("hide");
+                                $("#gridTicket").dxDataGrid("instance").refresh();
+                                $("#assignedUser").dxDropDownBox("instance").option("value",null);
+                            },
+                            failure: function (response) {
+                                alert(response);
+                            }
+                            });*@
+                    }
+                }
+            },
+            {
+                widget: "dxButton",
+                toolbar: 'top',
+                location: "after",
+                options: {
+                    type: "default",
+                    text: "Kapat",
+                    icon: "close",
+                    onClick: function (e) {
+                        $("#popupReason").dxPopup("hide");
+                        //$("#popupAssignedUser").dxPopup("hide");
+                        //$("#assignedUser").dxDropDownBox("instance").option("value", null);
+                    }
+                }
+            }
+            ]
+        });
+    });
+
+    $(function () {
+        $("#popupLocation").dxPopup({
+            title: "Kişiye Ata",
+            contentTemplate: LocationTemplate,
+            showCloseButton: true,
+            width: 1000,
+            height: 500,
+            toolbarItems: [{
+                text: "Kişi Seç",
+                location: "before"
+            },
+            {
+                widget: "dxButton",
+                toolbar: 'top',
+                location: "after",
+                options: {
+                    type: 'success',
+                    text: "Kaydet",
+                    icon: "save",
+                    onClick: function (e) {
+                        @*var userId = $("#assignedUser").dxDropDownBox("instance").option("value");
+                        var ticketId = dataRow.Id;
+                        if (ticketId != null) {
+                            ticketId = dataRow.Id;
+                        }
+                        var ajaxHeader = {};
+                        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+                        $.ajax({
+                            type: "POST",
+                            url: "Tickets?handler=ChangeTicketState",
+                            headers: ajaxHeader,
+                            data: { "Id": ticketStateId, "ticketStateId": ticketStatusId, "stringUserId": userId[0], "ticketId": ticketId },
+                            async: true,
+                            success: function (response) {
+                                $("#popupAssignedUser").dxPopup("hide");
+                                $("#popupContainer").dxPopup("hide");
+                                $("#gridTicket").dxDataGrid("instance").refresh();
+                                $("#assignedUser").dxDropDownBox("instance").option("value", null);
+                            },
+                            failure: function (response) {
+                                alert(response);
+                            }
+                        });*@
+                    }
+                }
+            },
+            {
+                widget: "dxButton",
+                toolbar: 'top',
+                location: "after",
+                options: {
+                    type: "default",
+                    text: "Kapat",
+                    icon: "close",
+                    onClick: function (e) {
+                        $("#popupLocation").dxPopup("hide");
+                        //$("#popupAssignedUser").dxPopup("hide");
+                        //$("#assignedUser").dxDropDownBox("instance").option("value", null);
+                    }
+                }
+            }
+            ]
+        });
+    });
+    function syncTreeViewSelectionReason(treeView, value) {
+        if (!value) {
+            treeView.unselectAll();
+        } else {
+            treeView.selectItem(value);
+        }
+    }
+
+    function treeBoxMulti_valueChangedReason(e) {
+        if (e.component.content() == null)
+            return;
+        var $treeView = e.component.content().find(".dx-treeview");
+        if ($treeView.length) {
+            syncTreeViewSelection($treeView.dxTreeView("instance"), e.value);
+        }
+    }
+    function onClickButtonOpenPopupReason(e) {
+        $("#popupReason").dxPopup("show");
+    }
+
+    function onClickButtonOpenPopupLocation(e) {
+        $("#popupLocation").dxPopup("show");
+    }
+    function beforeSendReasonList(type,e) {
+
+    }
+    function beforeSendLocationList(type, e) {
+
+    }
+    function onSelectionChangedReasonList(e) {
+        if (e.addedItems.length != 0) {
+            for (var i = 0; i < e.addedItems.length; i++) {
+                listReason.push(e.addedItems[i].Id);
+            }
+        }
+        else {
+            for (var i = 0; i < e.removedItems.length; i++) {
+                var myIndex = listReason.indexOf(e.removedItems[i].Id);
+                if (myIndex !== -1) {
+                    listReason.splice(myIndex, 1);
+                }
+            }
+        }
+    }
+    function onSelectionChangedLocationList(e) {
+        if (e.addedItems.length != 0) {
+            for (var i = 0; i < e.addedItems.length; i++) {
+                listLocation.push(e.addedItems[i].Id);
+            }
+        }
+        else{
+            for (var i = 0; i < e.removedItems.length; i++) {
+                var myIndex = listLocation.indexOf(e.removedItems[i].Id);
+                if (myIndex !== -1) {
+                    listLocation.splice(myIndex, 1);
+                }
+            }
+        }
+    }
+</script>
+
+<style>
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+
+    .dx-datagrid-column-chooser-button {
+        background-color: #337ab7;
+    }
+
+    .dx-datagrid-export-button {
+        background-color: #337ab7;
+    }
+
+    .dx-icon-export-to {
+        color: white !important;
+    }
+
+    .dx-icon-column-chooser {
+        color: white !important;
+    }
+
+    .dx-icon-export-excel-button {
+        color: white !important;
+    }
+
+    .dx-datagrid-export-button.dx-state-hover {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-export-button.dx-state-active {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-hover {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-active {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+</style>
+

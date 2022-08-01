@@ -1,0 +1,24 @@
+﻿@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Custom
+
+@model List<CustomLocationDto>
+@(Html.DevExtreme()
+    .DropDownBox()
+    .ID("dpFastTicketRedirectLocationFilter")
+    //.DataSource(d => d.RemoteController()
+    //.Key("HierarchyId")
+    //.LoadUrl(Url.Page(null, "LocationData"))
+    //)
+    .DataSource(Model, "HierarchyId")
+    .DeferRendering(false)
+    .ValueExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .DropDownOptions(o => o.Height(350))
+    .Placeholder("Lütfen Seçiniz..")
+    .ShowClearButton(true)
+    .OnValueChanged("Location.treeBox_valueChanged")
+    .ContentTemplate(
+        @<text>
+    @await Html.PartialAsync("../Shared/Periodic/_FastTicketRedirectFilterLocationTreeViewMultiple")
+</text>
+    )
+)

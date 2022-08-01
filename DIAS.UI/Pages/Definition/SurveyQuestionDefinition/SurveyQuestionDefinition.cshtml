@@ -1,0 +1,3461 @@
+﻿@page
+@model DIAS.UI.Pages.Definition.SurveyQuestionModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@using DIAS_UI.Helpers
+@using Newtonsoft.Json;
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Standard
+@{
+    var user = SessionHelper.GetObjectFromJson(HttpContext.Session, "user");
+    var convertedUser = JsonConvert.DeserializeObject<UserDto>
+    (user);
+    var userViewData = convertedUser;
+
+    var priorities = new[] { "Low", "Normal", "Urgent", "High" };
+}
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/polyfills.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.14/jspdf.plugin.autotable.min.js"></script>
+<script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.es.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.5.23/dist/jspdf.plugin.autotable.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/3.8.0/exceljs.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" defer></script>
+<script src="~/helper/trCharHelper.js"></script>
+<script>
+    window.jsPDF = window.jspdf.jsPDF;
+    applyPlugin(window.jsPDF);
+</script>
+<div class="card">
+
+    <div class="card-body">
+
+        @(Html.DevExtreme().DataGrid<SurveyQuestionDto>
+                ()
+                .ID("gridSurveyQuestionDefinition")
+                .DataSource(ds => ds.RemoteController()
+                .OnBeforeSend("beforeSendSurveyQuestionDefinition")
+                .Key("Id")
+                .LoadUrl(Url.Page(null, "GridData"))
+                .InsertUrl(Url.Page(null, "GridRow"))
+                .UpdateUrl(Url.Page(null, "GridRowUpdate"))
+                .DeleteUrl(Url.Page(null, "GridRowDelete"))
+                )
+                .ErrorRowEnabled(false)
+                .Export(o => o.Enabled(true).AllowExportSelectedData(true))
+                .OnExporting("surveyQuestionDefinitionGridDataExporting")
+                .ColumnChooser(c => c.Enabled(true).AllowSearch(true).Mode(GridColumnChooserMode.Select))
+                .HeaderFilter(o=>o.AllowSearch(true))
+                .FilterRow(o => o.Visible(true))
+                .Selection(s => s.Mode(SelectionMode.Single))
+                .OnSelectionChanged("onSelectionChangedSurveyQuestionDefinition")
+                .OnToolbarPreparing("onToolbarPreparingSurveyQuestionDefinition")
+                .OnCellPrepared("onCellPreparedSurveyQuestionDefinition")
+                .OnContentReady("onContentReadySurveyQuestionDefinition")
+                .RemoteOperations(true)
+                .ShowBorders(true)
+                .Paging(p => p.Enabled(false))
+                .Editing(e => e.Mode(GridEditMode.Popup)
+                .AllowUpdating(true)
+                .AllowDeleting(true)
+                .AllowAdding(true)
+                .SelectTextOnEditStart(true)
+                .UseIcons(true)
+                .StartEditAction(GridStartEditAction.DblClick)
+                .Popup(p => p
+                .Title("Anket Soru Tanımlama")
+                .ID("popupSurveyQuestionDefinitionContainer")
+                .ShowTitle(true)
+                .Width(1400)
+                .Height(1000)
+                .OnShowing("setPopupTitleSurveyQuestionDefinition")
+                .ShowCloseButton(false)
+                )
+                .Form(f => f.Items(items =>
+                {
+                    items.AddGroup()
+                    .Items(groupItems =>
+                    {
+                        groupItems.AddTabbed()
+                    .TabPanelOptions(o =>
+                    {
+                        o.DeferRendering(false);
+                        o.AnimationEnabled(true);
+                        o.ID("surveyQuestionDefinitionTab");
+                        o.Width(1350);
+                        o.AnimationEnabled(true);
+                        o.ShowNavButtons(true);
+                        o.Height(640);
+                    })
+                    .Tabs(tabItems =>
+                    {
+                        tabItems.Add().Icon("fas fa-save")
+                    .Title("Form Tanımı").Template(new TemplateName("SurveyQuestionDefinitionTemplate"));
+
+                });
+                    });
+                }).ID("SurveyQuestionDefinitionForm")))
+                .Columns(columns =>
+                {
+                    columns.AddFor(m => m.Code).Caption("Kodu").AllowEditing(true);
+                    columns.AddFor(m => m.QuestionName).Caption("Soru İsmi").AllowEditing(true);
+                    columns.AddFor(m => m.AddedByUser.FirstName).Caption("Ekleyen Kullanıcı Ad").AllowEditing(true);
+                    columns.AddFor(m => m.AddedByUser.LastName).Caption("Ekleyen Kullanıcı Soyad").AllowEditing(true);
+
+                })
+                .OnEditingStart(@<text> function(e) {onEditingStartSurveyQuestionDefinition(e) } </text>)
+                .OnInitNewRow(@<text> function(e) { onInitNewRowSurveyQuestionDefinition(e); } </text>)
+
+                )
+    </div>
+</div>
+
+
+@using (Html.DevExtreme().NamedTemplate("SurveyQuestionDefinitionTemplate"))
+{
+    @(Html.DevExtreme().ScrollView()
+        .ID("scrollview")
+        .ScrollByContent(true)
+        .ScrollByThumb(true)
+        //.OnReachBottom("scrollView_reachBottom")
+        .ReachBottomText("Updating...")
+        .ShowScrollbar(ShowScrollbarMode.OnScroll)
+        .Content(@<text>
+            <div class="widget-container">
+        <div style="display:flex">
+            <div class="col-md-8">
+                @Html.DevExtreme().TextBox().ID("surveyQuestionDefinitionName").Placeholder("Soru Adı giriniz...").Height(50).ValidationStatus(ValidationStatus.Valid)
+                @Html.DevExtreme().TextBox().ID("surveyQuestionDefinitionCode").Placeholder("Soru Kodunu giriniz...").Height(50)
+            </div>
+            <div style="width: 1px; height: 1000px; background-color: #b7b7b7"></div>
+            <div class="col-md-3">
+                Componentler
+                @await Html.PartialAsync("../Definition/SurveyQuestionDefinition/_DraggingCombo")
+            </div>
+        </div>
+    </div>
+        </text>)
+    )
+
+}
+
+
+@using (Html.DevExtreme().NamedTemplate("surveyQuestionDragListDropDownTemplate"))
+{
+    @(Html.DevExtreme().SelectBox().Disabled(true).Placeholder("Dropdown"))
+}
+@using (Html.DevExtreme().NamedTemplate("surveyQuestionDragListTextBoxTemplate"))
+{
+    @(Html.DevExtreme().TextBox().Disabled(true).Placeholder("TextBox"))
+}
+
+@using (Html.DevExtreme().NamedTemplate("surveyQuestionDragListRadioButtonTemplate"))
+{
+    @(Html.DevExtreme().RadioGroup().Items(priorities).Disabled(true))
+}
+
+@using (Html.DevExtreme().NamedTemplate("surveyQuestionDragListCheckBoxTemplate"))
+{
+    <div>@(Html.DevExtreme().CheckBox().Value(false).Text("Not Selected"))</div>
+    <div>@(Html.DevExtreme().CheckBox().Value(true).Text("Selected"))</div>
+    <div>@(Html.DevExtreme().CheckBox().Value(null).Text("Indeterminate"))</div>
+    <div>@(Html.DevExtreme().CheckBox().Value(false).Text("Disabled").Disabled(true))</div>
+    <div>@(Html.DevExtreme().CheckBox().Value(true).Text("Disabled Selected").Disabled(true))</div>
+    <div>@(Html.DevExtreme().CheckBox().Value(null).Text("Disabled Indeterminate").Disabled(true))</div>
+}
+
+
+<script type="text/javascript">
+    var data;
+    var SurveyQuestionDefinitionDataGrid;
+    let arrComboBox = [];
+    let arrComboBoxUpdate = [];
+    let arrTextBox = [];
+    let arrTextBoxUpdate = [];
+    let arrRadioBox = [];
+    let arrRadioBoxUpdate = [];
+    let arrCheckBox = [];
+    let arrCheckBoxUpdate = [];
+    let arrRadioItemValues = [];
+    let arrRadioItemValuesUpdate = [];
+    let checkBoxItemValues = [];
+    let checkBoxItemValuesUpdate = [];
+    let arrObjectSurveyAnswerDto = [];
+    let valueOfCountCheckBox = 0;
+    let datasForCheckBox = [];
+    let datasForCheckBoxUpdate = [];
+    let arrOrder = [];
+    let errorCount = 0;
+    let sayac = 0;
+    let sayacUpdate = 0;
+    let arrFieldCheckBox = [];
+    let arrFieldCheckBoxUpdate = [];
+    let inputValue;
+    let arrCreatedFieldCheckbox = [];
+    let arrCreatedFieldCheckboxUpdate = [];
+    let buttonCount = 0;
+    var count = 1;
+    let updateCount = 1;
+
+    const pdfOptionsOfSurveyQuestionStateDefinition = [
+        { Id: 1, name: 'Tüm Verileri Dışarı Aktar' },
+        { Id: 2, name: 'Seçili Satırı Dışa Aktar' }
+    ];
+
+    function onEditingStartSurveyQuestionDefinition(e) {
+        data = e.data;
+    }
+
+    function onInitNewRowSurveyQuestionDefinition(e) {
+        data = null;
+    }
+
+    function onToolbarPreparingSurveyQuestionDefinition(e) {
+        e.toolbarOptions.items.forEach((value, index, array) => {
+            if (value.name == "addRowButton") {
+                e.toolbarOptions.items[0].showText = "always";
+                e.toolbarOptions.items[0].options.text = "Soru Ekle";
+                e.toolbarOptions.items[0].options.icon = "plus";
+                e.toolbarOptions.items[0].options.type = "success";
+            }
+        });
+    }
+
+    function onSelectionChangedSurveyQuestionDefinition(data) {
+        let rowData = data.selectedRowsData[0];
+        if (!rowData)
+            return;
+        dataRow = rowData;
+    }
+
+    function setPopupTitleSurveyQuestionDefinition(e) {
+
+
+        if (data == null) {
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("height", "90%");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[0].toolbar", "top");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.icon", "save");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.type", "success");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].toolbar", "top");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.text", "Kapat");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.icon", "close");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.type", "default");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.onClick", function (e) {
+                $("#popupSurveyQuestionDefinitionContainer").dxPopup("hide");
+                arrComboBox = [];
+                arrComboBoxUpdate = [];
+                arrTextBox = [];
+                arrTextBoxUpdate = [];
+                arrRadioBox = [];
+                arrRadioBoxUpdate = [];
+                arrCheckBox = [];
+                arrRadioItemValues = [];
+                arrRadioItemValuesUpdate = [];
+                checkBoxItemValues = [];
+                arrObjectSurveyAnswerDto = [];
+                valueOfCountCheckBox = 0;
+                datasForCheckBox = [];
+                datasForCheckBoxUpdate = [];
+                arrOrder = [];
+                errorCount = 0;
+                sayac = 0;
+                sayacUpdate = 0;
+                arrFieldCheckBox = [];
+                arrFieldCheckBoxUpdate = [];
+                inputValue;
+                arrCreatedFieldCheckbox = [];
+                arrCreatedFieldCheckboxUpdate = [];
+                buttonCount = 0;
+                count = 1;
+                updateCount = 0;
+                checkBoxItemValuesUpdate = [];
+            });
+            $(".dx-toolbar-before").children().children().children().prepend("<i class='fas fa-question' style='padding-right:6px;'></i>");
+            }
+        if (data != null) {
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup({
+                title: "Soru Düzenle",
+            });
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("height", "90%");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[0].toolbar", "top");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.icon", "save");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.type", "success");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.text", "Güncelle");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.onClick", function (e) {
+                updateForm();
+            });
+
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].toolbar", "top");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.text", "Kapat");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.icon", "close");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.type", "default");
+            $("#popupSurveyQuestionDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.onClick", function (e) {
+                $("#popupSurveyQuestionDefinitionContainer").dxPopup("hide");
+                console.log("sadikkapat");
+                arrComboBox = [];
+                arrComboBoxUpdate = [];
+                arrTextBox = [];
+                arrTextBoxUpdate = [];
+                arrRadioBox = [];
+                arrRadioBoxUpdate = [];
+                arrCheckBox = [];
+                arrRadioItemValues = [];
+                arrRadioItemValuesUpdate = [];
+                checkBoxItemValues = [];
+                arrObjectSurveyAnswerDto = [];
+                valueOfCountCheckBox = 0;
+                datasForCheckBox = [];
+                datasForCheckBoxUpdate = [];
+                arrOrder = [];
+                errorCount = 0;
+                sayac = 0;
+                sayacUpdate = 0;
+                arrFieldCheckBox = [];
+                arrFieldCheckBoxUpdate = [];
+                inputValue;
+                arrCreatedFieldCheckbox = [];
+                arrCreatedFieldCheckboxUpdate = [];
+                buttonCount = 0;
+                count = 1;
+                updateCount = 0;
+                checkBoxItemValuesUpdate = [];
+            });
+            $(".dx-toolbar-before").children().children().children().prepend("<i class='fas fa-question' style='padding-right:6px;'></i>");
+
+
+                data.SurveyAnswerControlDtos.forEach((value, index) => {
+                    if (value.DropDownDtoObj) {
+                        if ($(".field").length != 0) {
+
+                            $(`<div class='field DROPDOWN' id='field${updateCount}'>
+<button id='parentComboButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteComboElementUpdate(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForDp${updateCount}' style='margin-top: 5px;'></div>
+<div style="display:flex">
+<div id='combo${updateCount}' style='margin-top: 5px;'></div>
+<div><button type='button' class='btn btn-success btn-sm' onclick="onAddItemComboElement('combo${updateCount}')" style='margin-top: 5px;height:36px'>+</button></div>
+</div>
+<div id='textDropDown${updateCount}' style='margin-top: 5px;'></div>
+<div id='comboExplainTexBox${updateCount}' style='margin-top: 5px;'></div></div>`).insertAfter(`#field${updateCount - 1}`);
+                            createDropDownRequiredUpdate(updateCount);
+                            createcomboExplainTexBoxUpdate(value.DropDownDtoObj.Question);
+                            createTextDropDownUpdate(value.DropDownDtoObj.Label);
+                            createDropDownUpdate(value.DropDownDtoObj.Datas);
+                            updateCount++;
+                        }
+                        else {
+
+                            $(`<div class='field DROPDOWN' id='field${updateCount}'>
+
+<button id='parentComboButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteComboElementUpdate(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForDp${updateCount}' style='margin-top: 5px;'></div>
+<div style="display:flex">
+<div id='combo${updateCount}' style='margin-top: 5px;'></div>
+<div><button type='button' class='btn btn-success btn-sm' onclick="onAddItemComboElement('combo${updateCount}')" style='margin-top: 5px;height:36px'>+</button></div>
+</div>
+<div id='textDropDown${updateCount}' style='margin-top: 5px;'></div>
+<div id='comboExplainTexBox${updateCount}' style='margin-top: 5px;'></div></div>
+`).insertAfter("#surveyQuestionDefinitionCode");
+                            createDropDownRequiredUpdate(updateCount);
+                            createcomboExplainTexBoxUpdate(value.DropDownDtoObj.Question);
+                            createTextDropDownUpdate(value.DropDownDtoObj.Label);
+                            createDropDownUpdate(value.DropDownDtoObj.Datas);
+                            updateCount++;
+
+                        }
+                    }
+                    if (value.TextBoxDtoObj) {
+                        if ($(".field").length != 0) {
+                            $(`<div class='field TEXTBOX' id='field${updateCount}'>
+<button id='parentTextButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteTextElementUpdate(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForTxtBox${updateCount}' style='margin-top: 5px;'></div>
+<div id='text${updateCount}' style='margin-top: 5px;'></div>
+<div id='textLabel${updateCount}' style='margin-top: 5px;'></div>
+<div id='textExplainTexBox${updateCount}' style='margin-top: 5px;'></div>
+</div></div>`).insertAfter(`#field${updateCount - 1}`);
+
+                            createTextBoxRequiredUpdate(updateCount);
+                            createTextExplainTexBoxUpdate(value.TextBoxDtoObj.Question);
+                            createTextForTextBoxUpdate(value.TextBoxDtoObj.Label);
+                            createTextBoxUpdate();
+                            updateCount++;
+
+                        }
+                        else {
+                            $(`<div class='field TEXTBOX'  id='field${updateCount}'>
+<button id='parentTextButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteTextElementUpdate(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForTxtBox${updateCount}' style='margin-top: 5px;'></div>
+<div id='text${updateCount}' style='margin-top: 5px;'></div>
+<div id='textLabel${updateCount}' style='margin-top: 5px;'></div>
+<div id='textExplainTexBox${updateCount}' style='margin-top: 5px;'></div>
+</div></div>`).insertAfter("#surveyQuestionDefinitionCode");
+                            createTextBoxRequiredUpdate(updateCount);
+                            createTextExplainTexBoxUpdate(value.TextBoxDtoObj.Question);
+                            createTextForTextBoxUpdate(value.TextBoxDtoObj.Label);
+                            createTextBoxUpdate();
+                            updateCount++;
+                        }
+                    }
+                    if (value.RadioGroupDtoObj) {
+                        if ($(".field").length != 0) {
+                            $(`<div class='field RADIOGROUP' id='field${updateCount}' >
+<button id='parentRadioButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteRadioElementUpdate(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForRadioGroup${updateCount}' style='margin-top: 5px;'></div>
+<div id='radioExplainTexBox${updateCount}' style='margin-top: 5px;'></div>
+<div style="display:flex;">
+<div id='addRadioItemTexBox${updateCount}' style='margin-top: 5px;'></div>
+<button id='parentRadioAddedItemButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onAddedRadioItemElementUpdate(this,'addRadioItemTexBox${updateCount}','radio${updateCount}')" style="width: 66px;height: 33px;margin-top: 5px;">+</button>
+</div>
+<div id='radio${updateCount}' style='margin-top: 5px;'></div>
+</div>`).insertAfter(`#field${updateCount - 1}`);
+                            createRadioGroupRequiredUpdate(updateCount);
+                            createRadioExplainTexBoxUpdate(value.RadioGroupDtoObj.Question);
+                            addRadioItemTexBoxUpdate(value.RadioGroupDtoObj.Label);
+                            createRadioBoxUpdate(value.RadioGroupDtoObj.Datas);
+                            updateCount++;
+
+                        }
+                        else {
+
+                            $(`<div class='field RADIOGROUP' id='field${updateCount}'>
+<button id='parentRadioButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteRadioElementUpdate(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForRadioGroup${updateCount}' style='margin-top: 5px;'></div>
+<div id='radioExplainTexBox${updateCount}' style='margin-top: 5px;'></div>
+<div style="display:flex;">
+<div id='addRadioItemTexBox${updateCount}' style='margin-top: 5px;'></div>
+<button id='parentRadioAddedItemButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onAddedRadioItemElementUpdate(this,'addRadioItemTexBox${updateCount}','radio${updateCount}')" style="width: 66px;height: 33px;margin-top: 5px;">+</button>
+</div>
+<div id='radio${updateCount}' style='margin-top: 5px;'></div>
+</div>`).insertAfter("#surveyQuestionDefinitionCode");
+                            createRadioGroupRequiredUpdate(updateCount);
+                            createRadioExplainTexBoxUpdate(value.RadioGroupDtoObj.Question);
+                            addRadioItemTexBoxUpdate(value.RadioGroupDtoObj.Label);
+                            createRadioBoxUpdate(value.RadioGroupDtoObj.Datas);
+                            updateCount++;
+
+                        }
+                    }
+                    if (value.CheckBoxDtoObj) {
+                        if ($(".field").length != 0) {
+                            $(`<div class='field CHECKBOXUPDATE' id='field${updateCount}' ><div class="parentCheckBoxClass" id="parentCheckBox${updateCount}">
+<button id='parentCheckBoxButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteCheckBoxElementUpdate(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForCheckBox${updateCount}' style='margin-top: 5px;'></div>
+<div id='createCheckboxExplainTexBox${updateCount}' style='margin-top: 5px;'></div>
+
+<div id='checkBoxDisplay${updateCount}' style="display:flex;">
+<div id='addCheckboxItemTexBox${updateCount}' style='margin-top: 5px;'></div>
+<button id='parentCheckBoxAddedItemButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onAddedCheckBoxItemElementUpdateV2(${updateCount})" style="width: 66px;height: 33px;margin-top: 5px;">+</button>
+</div>
+</div>
+</div>
+`).insertAfter(`#field${updateCount - 1}`);
+                            createCheckBoxRequiredUpdate(updateCount);
+                            createCheckboxExplainTexBoxUpdate(value.CheckBoxDtoObj.Question);
+                            addCheckboxItemTexBoxUpdate(value.CheckBoxDtoObj.Label);
+                            onAddedCheckBoxItemElementUpdate(updateCount, value.CheckBoxDtoObj.Datas, true);
+                            updateCount++;
+                        }
+                        else {
+                            $(`<div class='field CHECKBOXUPDATE' id='field${updateCount}' ><div class="parentCheckBoxClass" id="parentCheckBox${updateCount}">
+<button id='parentCheckBoxButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteCheckBoxElementUpdate(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForCheckBox${updateCount}' style='margin-top: 5px;'></div>
+<div id='createCheckboxExplainTexBox${updateCount}' style='margin-top: 5px;'></div>
+
+<div id='checkBoxDisplay${updateCount}' style="display:flex;">
+<div id='addCheckboxItemTexBox${updateCount}' style='margin-top: 5px;'></div>
+<button id='parentCheckBoxAddedItemButton${updateCount}' type="button" class="btn btn-primary btn-sm" onclick="onAddedCheckBoxItemElementUpdateV2(${updateCount})" style="width: 66px;height: 33px;margin-top: 5px;">+</button>
+</div>
+</div>
+</div>`).insertAfter("#surveyQuestionDefinitionCode");
+                            createCheckBoxRequiredUpdate(updateCount);
+                            createCheckboxExplainTexBoxUpdate(value.CheckBoxDtoObj.Question);
+                            addCheckboxItemTexBoxUpdate(value.CheckBoxDtoObj.Label);
+                            onAddedCheckBoxItemElementUpdate(updateCount, value.CheckBoxDtoObj.Datas, true);
+                            updateCount++;
+                        }
+                    }
+                });
+                $("#surveyQuestionDefinitionCode").dxTextBox("instance").option("value", data.SurveyQuestionCode);
+                $("#surveyQuestionDefinitionName").dxTextBox("instance").option("value", data.Name);
+            }
+    }
+
+
+    //cs ye göndermek için kullanılan fonksiyon
+    function beforeSendSurveyQuestionDefinition(type, e) {        
+            if (type == "load") return;
+        if (type == "update") {
+
+                for (var i = 0; i < $(".field").length; i++) {
+                    arrOrder.push($(".field")[i].classList[1]);
+                }
+                if (arrComboBoxUpdate != 0) {
+                    arrComboBoxUpdate.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let DropDownDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var combo = $(`#${value}`).dxSelectBox("instance");
+                        combo.getDataSource().reload();
+                        var Datas = combo.getDataSource().items();
+                        var Label = $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((Label.replace(/\s/g, '').length) && (Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            return;
+                        }
+
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+
+                            //örnek olarak bırakıldı
+                            //DevExpress.ui.notify({
+                            //    message: `${index + 1}. dropdown Question ve Label yoktur`,
+                            //    type: "warning",
+                            //    displayTime: 1000,
+                            //    height: 50,
+                            //    width: 200,
+                            //    position: {
+                            //        my: 'right top',
+                            //        at: 'right top',
+                            //    },
+                            //});
+                            return;
+                        }
+                        objectSurveyAnswerDto.DropDownDtoObj = DropDownDto;
+                        objectSurveyAnswerDto.DropDownDtoObj.Datas = Datas;
+                        objectSurveyAnswerDto.DropDownDtoObj.Label = Label;
+                        objectSurveyAnswerDto.DropDownDtoObj.Question = Question;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 2;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                }
+                if (arrComboBox.length != 0) {
+                    arrComboBox.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let DropDownDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var combo = $(`#${value}`).dxSelectBox("instance");
+                        combo.getDataSource().reload();
+                        var Datas = combo.getDataSource().items();
+                        var Label = $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((Label.replace(/\s/g, '').length) && (Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            return;
+                        }
+
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+
+                            //örnek olarak bırakıldı
+                            //DevExpress.ui.notify({
+                            //    message: `${index + 1}. dropdown Question ve Label yoktur`,
+                            //    type: "warning",
+                            //    displayTime: 1000,
+                            //    height: 50,
+                            //    width: 200,
+                            //    position: {
+                            //        my: 'right top',
+                            //        at: 'right top',
+                            //    },
+                            //});
+                            return;
+                        }
+                        console.log("objectSurveyAnswerDto.DropDownDtoObj");
+                        objectSurveyAnswerDto.DropDownDtoObj = DropDownDto;
+                        objectSurveyAnswerDto.DropDownDtoObj.Datas = Datas;
+                        objectSurveyAnswerDto.DropDownDtoObj.Label = Label;
+                        objectSurveyAnswerDto.DropDownDtoObj.Question = Question;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 2;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+                if (arrTextBoxUpdate.length != 0) {
+
+                    arrTextBoxUpdate.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let TextBoxDto = new Object();
+                        var valueOfCount = value.substring(4);
+                        var Label = $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+                        console.log("objectSurveyAnswerDto.TextBoxDtoObj");
+                        objectSurveyAnswerDto.TextBoxDtoObj = TextBoxDto;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Label = Label;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Question = Question;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 4;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+
+                    });
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrTextBox.length != 0) {
+
+                    arrTextBox.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let TextBoxDto = new Object();
+                        var valueOfCount = value.substring(4);
+                        var Label = $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+                        console.log("objectSurveyAnswerDto.TextBoxDtoObj");
+                        objectSurveyAnswerDto.TextBoxDtoObj = TextBoxDto;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Label = Label;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Question = Question;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 4;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+
+                    });
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrRadioBoxUpdate.length != 0) {
+                    arrRadioBoxUpdate.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let RadioGroupDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var radioGroup = $(`#${value}`).dxRadioGroup("instance");
+                        radioGroup.getDataSource().reload();
+                        var datas = radioGroup.getDataSource().items();
+                        var Label = $(`#addRadioItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        if ((!Question.replace(/\s/g, '').length) && datas.length == 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && datas.length != 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+                        else if ((Question.replace(/\s/g, '').length) && datas.length == 0) {
+
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+                        objectSurveyAnswerDto.RadioGroupDtoObj = RadioGroupDto;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Datas = datas;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Label = Label;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Question = Question;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 3;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+                if (arrRadioBox.length != 0) {
+                    arrRadioBox.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let RadioGroupDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var radioGroup = $(`#${value}`).dxRadioGroup("instance");
+                        radioGroup.getDataSource().reload();
+                        var datas = radioGroup.getDataSource().items();
+                        var Label = $(`#addRadioItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        if ((!Question.replace(/\s/g, '').length) && datas.length == 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && datas.length != 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+                        else if ((Question.replace(/\s/g, '').length) && datas.length == 0) {
+
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+                        console.log("objectSurveyAnswerDto.RadioGroupDtoObj");
+                        objectSurveyAnswerDto.RadioGroupDtoObj = RadioGroupDto;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Datas = datas;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Label = Label;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Question = Question;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 3;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrCreatedFieldCheckboxUpdate.length != 0) {
+
+                    if (arrCheckBoxUpdate.length == 0) {
+
+                        arrCreatedFieldCheckboxUpdate.forEach((value) => {
+
+                            console.log(value);
+                        })
+
+                        //arrCreatedFieldCheckboxUpdate.forEach((value) => {
+                        //    var Question = $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("value");
+                        //    if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+                        //        $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                        //        DevExpress.ui.notify({
+                        //            message: "Lütfen Veri Giriniz",
+                        //            type: "warning",
+                        //            displayTime: 1000,
+                        //            height: 50,
+                        //            width: 200,
+                        //            position: {
+                        //                my: 'right top',
+                        //                at: 'right top',
+                        //            },
+                        //        });
+                        //        errorCount++;
+                        //        return;
+                        //    }
+                        //    else if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length != 0) {
+                        //        $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                        //        errorCount++;
+                        //        return;
+                        //    }
+                        //    else if ((Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+
+                        //        DevExpress.ui.notify({
+                        //            message: "Lütfen Veri Giriniz",
+                        //            type: "warning",
+                        //            displayTime: 1000,
+                        //            height: 50,
+                        //            width: 200,
+                        //            position: {
+                        //                my: 'right top',
+                        //                at: 'right top',
+                        //            },
+                        //        });
+                        //        errorCount++;
+                        //        return;
+                        //    }
+                        //});
+                    }
+                    else {
+                        var groupBy = function (xs, key) {
+                            return xs.reduce(function (rv, x) {
+                                (rv[x[key]] = rv[x[key]] || []).push(x);
+                                return rv;
+                            }, {});
+                        };
+                        var groupedArrayCheckBox = groupBy(arrCheckBox, 'field');
+                        for (var i = 0; i < $(".CHECKBOX").length; i++) {
+                            var fieldName = $(".CHECKBOX")[i].id;
+                            var fieldNameSubstring = fieldName.substring(5);
+                            let objectSurveyAnswerDto = new Object();
+
+                            groupedArrayCheckBox[fieldName].forEach((value) => {
+                                datasForCheckBox.push(value.obj2.data);
+                            });
+
+                            let CheckBoxDto = new Object();
+                            var Question = $(`#createCheckboxExplainTexBox${fieldNameSubstring}`).dxTextBox("instance").option("value");
+
+                            objectSurveyAnswerDto.CheckBoxDtoObj = CheckBoxDto;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Datas = datasForCheckBox;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Question = Question;
+                            objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 1;
+                            arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                        }
+                    }
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+
+                }
+                if (arrCreatedFieldCheckbox.length != 0) {
+
+                    if (arrCheckBox.length == 0) {
+                        arrCreatedFieldCheckbox.forEach((value) => {
+                            var Question = $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("value");
+                            if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+                                $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                                DevExpress.ui.notify({
+                                    message: "Lütfen Veri Giriniz",
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                                errorCount++;
+                                return;
+                            }
+                            else if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length != 0) {
+                                $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                                errorCount++;
+                                return;
+                            }
+                            else if ((Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+
+                                DevExpress.ui.notify({
+                                    message: "Lütfen Veri Giriniz",
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                                errorCount++;
+                                return;
+                            }
+                        });
+                    }
+                    else {
+                        var groupBy = function (xs, key) {
+                            return xs.reduce(function (rv, x) {
+                                (rv[x[key]] = rv[x[key]] || []).push(x);
+                                return rv;
+                            }, {});
+                        };
+                        var groupedArrayCheckBox = groupBy(arrCheckBox, 'field');
+                        for (var i = 0; i < $(".CHECKBOX").length; i++) {
+                            var fieldName = $(".CHECKBOX")[i].id;
+                            var fieldNameSubstring = fieldName.substring(5);
+                            let objectSurveyAnswerDto = new Object();
+
+                            groupedArrayCheckBox[fieldName].forEach((value) => {
+                                datasForCheckBox.push(value.obj2.data);
+                            });
+
+                            let CheckBoxDto = new Object();
+                            var Question = $(`#createCheckboxExplainTexBox${fieldNameSubstring}`).dxTextBox("instance").option("value");
+
+                            objectSurveyAnswerDto.CheckBoxDtoObj = CheckBoxDto;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Datas = datasForCheckBox;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Question = Question;
+                            objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 1;
+                            arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                        }
+                    }
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+
+                }
+
+                var ajaxHeader = {};
+                ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+                var Name = $("#surveyQuestionDefinitionName").dxTextBox("instance").option("value");
+                var SurveyQuestionCode = $("#surveyQuestionDefinitionCode").dxTextBox("instance").option("value");
+
+                console.log(arrObjectSurveyAnswerDto);
+
+                var formData = new FormData();
+                formData.append("Id", data.Id);
+                formData.append("AddedTime", data.AddedTime);
+                formData.append("IsDeleted", data.IsDeleted);
+                formData.append("IsActive", data.IsActive);
+                formData.append("Name", Name);
+                formData.append("SurveyQuestionCode", SurveyQuestionCode);
+                formData.append("Address", Adress);
+                formData.append("AddedByUserId", data.AddedByUserId);
+                formData.append("LastModifiedByUserId", @userViewData.Id);
+                e.data = formData;
+                e.contentType = false;
+                e.processData = false;
+                e.headers = ajaxHeader;
+            }
+            if (type == "insert") {
+                for (var i = 0; i < $(".field").length; i++) {
+                    arrOrder.push($(".field")[i].classList[1]);
+                }
+
+                if (arrComboBox.length != 0) {
+                    arrComboBox.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let DropDownDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var combo = $(`#${value}`).dxSelectBox("instance");
+                        combo.getDataSource().reload();
+                        var Datas = combo.getDataSource().items();
+                        var Label = $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForDp${valueOfCount}`).dxCheckBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((Label.replace(/\s/g, '').length) && (Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            return;
+                        }
+
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+
+                            //örnek olarak bırakıldı
+                            //DevExpress.ui.notify({
+                            //    message: `${index + 1}. dropdown Question ve Label yoktur`,
+                            //    type: "warning",
+                            //    displayTime: 1000,
+                            //    height: 50,
+                            //    width: 200,
+                            //    position: {
+                            //        my: 'right top',
+                            //        at: 'right top',
+                            //    },
+                            //});
+                            return;
+                        }
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+                        objectSurveyAnswerDto.DropDownDtoObj = DropDownDto;
+                        objectSurveyAnswerDto.DropDownDtoObj.Datas = Datas;
+                        objectSurveyAnswerDto.DropDownDtoObj.Label = Label;                        
+                        objectSurveyAnswerDto.DropDownDtoObj.Question = Question;
+                        objectSurveyAnswerDto.DropDownDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 2;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrTextBox.length != 0) {
+
+                    arrTextBox.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let TextBoxDto = new Object();
+                        var valueOfCount = value.substring(4);
+                        //var textBoxValue = $(`#${value}`).dxTextBox("instance").option("value");
+                        var Label = $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForTxtBox${valueOfCount}`).dxCheckBox("instance").option("value");
+
+                        if((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+
+                        objectSurveyAnswerDto.TextBoxDtoObj = TextBoxDto;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Label = Label;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Question = Question;
+                        objectSurveyAnswerDto.TextBoxDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 4;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+
+                    });
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrRadioBox.length != 0) {
+                    arrRadioBox.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let RadioGroupDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var radioGroup = $(`#${value}`).dxRadioGroup("instance");
+                        radioGroup.getDataSource().reload();
+                        var datas = radioGroup.getDataSource().items();
+                        var Label = $(`#addRadioItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForRadioGroup${valueOfCount}`).dxCheckBox("instance").option("value");
+                        if ((!Question.replace(/\s/g, '').length) && datas.length == 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && datas.length != 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+                        else if ((Question.replace(/\s/g, '').length) && datas.length == 0) {
+
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+
+                        objectSurveyAnswerDto.RadioGroupDtoObj = RadioGroupDto;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Datas = datas;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Label = Label;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Question = Question;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 3;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrCreatedFieldCheckbox.length != 0) {
+
+                    if (arrCheckBox.length == 0) {
+                        arrCreatedFieldCheckbox.forEach((value) => {
+                            var Question = $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("value");
+                            if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+                                $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                                DevExpress.ui.notify({
+                                    message: "Lütfen Veri Giriniz",
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                                errorCount++;
+                                return;
+                            }
+                            else if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length != 0) {
+                                $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                                errorCount++;
+                                return;
+                            }
+                            else if ((Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+
+                                DevExpress.ui.notify({
+                                    message: "Lütfen Veri Giriniz",
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                                errorCount++;
+                                return;
+                            }
+                        });
+                    }
+                    else {
+                            var groupBy = function (xs, key) {
+                                return xs.reduce(function (rv, x) {
+                                    (rv[x[key]] = rv[x[key]] || []).push(x);
+                                    return rv;
+                                }, {});
+                            };
+                        var groupedArrayCheckBox = groupBy(arrCheckBox, 'field');
+                        for (var i = 0; i < $(".CHECKBOX").length; i++) {
+                            var fieldName = $(".CHECKBOX")[i].id;
+                            var fieldNameSubstring = fieldName.substring(5);
+                            let objectSurveyAnswerDto = new Object();
+
+                            groupedArrayCheckBox[fieldName].forEach((value) => {
+                                 datasForCheckBox.push(value.obj2.data);
+                            });
+
+                            let CheckBoxDto = new Object();
+                            var Question = $(`#createCheckboxExplainTexBox${fieldNameSubstring}`).dxTextBox("instance").option("value");
+                            var isRequired = $(`#isRequiredForCheckBox${fieldNameSubstring}`).dxCheckBox("instance").option("value");
+
+                            if (isRequired != true) {
+                                isRequired = false;
+                            }
+
+                            objectSurveyAnswerDto.CheckBoxDtoObj = CheckBoxDto;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Datas = datasForCheckBox;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Question = Question;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.isRequired = isRequired;
+                            objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 1;
+                            arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                        }
+
+                        //if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+                        //    //createCheckboxExplainTexBox TextBox olarak düzenlenecektir
+                        //    $(`#createCheckboxExplainTexBox${valueOfCountCheckBox}`).dxTextBox("instance").option("isValid", false);
+                        //    DevExpress.ui.notify({
+                        //        message: "Lütfen Veri Giriniz",
+                        //        type: "warning",
+                        //        displayTime: 1000,
+                        //        height: 50,
+                        //        width: 200,
+                        //        position: {
+                        //            my: 'right top',
+                        //            at: 'right top',
+                        //        },
+                        //    });
+                        //    errorCount++;
+                        //    return;
+                        //}
+                        //else if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length != 0) {
+                        //    $(`#createCheckboxExplainTexBox${valueOfCountCheckBox}`).dxTextBox("instance").option("isValid", false);
+                        //    errorCount++;
+                        //    return;
+                        //}
+                        //else if ((Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+
+                        //    DevExpress.ui.notify({
+                        //        message: "Lütfen Veri Giriniz",
+                        //        type: "warning",
+                        //        displayTime: 1000,
+                        //        height: 50,
+                        //        width: 200,
+                        //        position: {
+                        //            my: 'right top',
+                        //            at: 'right top',
+                        //        },
+                        //    });
+                        //    errorCount++;
+                        //    return;
+                        //}
+                    }
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+
+                }
+
+                var ajaxHeader = {};
+                ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+                var Name = $("#surveyQuestionDefinitionName").dxTextBox("instance").option("value");
+                var SurveyQuestionCode = $("#surveyQuestionDefinitionCode").dxTextBox("instance").option("value");
+                var formData = new FormData();
+
+                formData.append("SurveyQuestionName", Name);
+                formData.append("SurveyQuestionCode", SurveyQuestionCode);
+                formData.append("SurveyAnswerControlDtosJson", JSON.stringify(arrObjectSurveyAnswerDto));
+                formData.append("OrderOfTheSurveyQuestion", arrOrder);
+                formData.append("AddedByUserId", @userViewData.Id);
+                e.data = formData;
+                e.contentType = false;
+                e.processData = false;
+                e.headers = ajaxHeader;
+                count = 1;
+                arrObjectSurveyAnswerDto = [];
+                sayac = 0;
+                arrComboBox = [];
+                arrTextBox = [];
+                arrRadioBox = [];
+                arrCheckBox = [];
+                arrOrder = [];
+                errorCount = 0;
+                datasForCheckBox = [];
+                arrCheckBoxUpdate = [];
+                e.success = function deneme(response) {
+                    console.log(response);
+                }
+            }
+            if (type == "delete") {
+                var Id = e.data.key;
+                var ajaxHeader = {};
+                ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+                var formData = new FormData();
+                formData.append("Id", Id);
+                e.data = formData;
+                e.contentType = false;
+                e.processData = false;
+                e.headers = ajaxHeader;
+            }
+    }
+
+
+
+    //Excel Exporting
+    function surveyQuestionDefinitionGridDataExporting(e) {
+        let workbook = new ExcelJS.Workbook();
+        let worksheet = workbook.addWorksheet('Tesis');
+
+        DevExpress.excelExporter.exportDataGrid({
+            component: e.component,
+            worksheet: worksheet,
+            autoFilterEnabled: true
+        }).then(function () {
+            workbook.xlsx.writeBuffer().then(function (buffer) {
+                saveAs(new Blob([buffer], { type: 'application/octet-stream' }), 'Tesisler.xlsx');
+            });
+        });
+        e.cancel = true;
+    }
+
+    //Grid düzenleyi büyüteçle değiştirmek
+    function onCellPreparedSurveyQuestionDefinition(e) {
+        if (e.column.type == "buttons") {
+            e.cellElement.children().removeClass('dx-icon-edit').addClass("dx-icon-search");
+            e.cellElement.children().attr("title", "Detay");
+        }
+    }
+
+    //pdf buttonu oluşturma
+    function onContentReadySurveyQuestionDefinition(e) {
+        SurveyQuestionDefinitionDataGrid = e.component;
+        e.component.deselectRows(e.component.getSelectedRowKeys());
+        var toolbar = e.element.find('.dx-datagrid-header-panel .dx-toolbar').dxToolbar('instance');
+        addSurveyQuestionDefinitionCustomItemPdfButton(toolbar);
+    }
+
+    //Pdf indirme
+    function addSurveyQuestionDefinitionCustomItemPdfButton(toolbar) {
+        var items = toolbar.option('items');
+        var myItem = DevExpress.data.query(items).filter(function (item) {
+            return item.name == 'btn_pdf_SurveyQuestionDefinition';
+        }).toArray();
+        if (!myItem.length) {
+            items.push({
+                id: 'btn_pdf_SurveyQuestionDefinition',
+                location: 'after',
+                widget: 'dxDropDownButton',
+                name: 'btn_pdf_SurveyQuestionDefinition',
+                options: {
+                    text: 'Pdf',
+                    icon: 'save',
+                    displayExpr: 'name',
+                    keyExpr: 'Id',
+                    elementAttr: {
+                        id: "btn_pdf_SurveyQuestionDefinitionId",
+                        class: "dpbColor"
+                    },
+                    dropDownOptions: {
+                        width: 230,
+                    },
+                    onItemClick: exportToPDF,
+                    items: pdfOptionsOfSurveyQuestionStateDefinition,
+                },
+            });
+            toolbar.option('items', items);
+        }
+    }
+
+    //Pdf indirme Fonksiyonu
+    function exportToPDF(e) {
+        const pdfDoc = new jsPDF('l');
+        pdfDoc.addFileToVFS('NotoSerif-Regular-normal.ttf', myFont);
+        pdfDoc.addFont('NotoSerif-Regular-normal.ttf', 'NotoSerif-Regular', 'normal');
+        pdfDoc.setFont("NotoSerif-Regular");
+        if (e.itemData.Id == 1) {
+            const options = {
+                jsPDFDocument: pdfDoc,
+                component: SurveyQuestionDefinitionDataGrid,
+                autoTableOptions: {
+                    rowPageBreak: 'auto',
+                    bodyStyles: { valign: 'top' },
+                    styles: {
+                        font: 'NotoSerif-Regular'
+                    }
+                }
+            };
+            DevExpress.pdfExporter.exportDataGrid(options).then(() => {
+                pdfDoc.setFontSize(5);
+            }).then(() => {
+                pdfDoc.save('filePDF.pdf');
+            });
+        }
+        if (e.itemData.Id == 2) {
+            const options = {
+                jsPDFDocument: pdfDoc,
+                component: SurveyQuestionDefinitionDataGrid,
+                autoTableOptions: {
+                    rowPageBreak: 'auto',
+                    bodyStyles: { valign: 'top' },
+                    styles: {
+                        font: 'NotoSerif-Regular'
+                    }
+                },
+                selectedRowsOnly: true
+            };
+            DevExpress.pdfExporter.exportDataGrid(options).then(() => {
+                pdfDoc.setFontSize(5);
+            }).then(() => {
+                pdfDoc.save('filePDF.pdf');
+            });
+        }
+}
+
+
+    //Create Fonksiyonlarının başladığı yer
+
+    //Dropdown
+    function surveyQuestionOnDragEndForDropDown(e) {
+
+        if (updateCount != 1) {
+            count = updateCount;
+        }
+
+            if ($(".field").length != 0) {
+                if (e.event.clientX <= 750) {
+
+                    $(`<div class='field DROPDOWN' id='field${count}'>
+<button id='parentComboButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteComboElement(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForDp${count}' style='margin-top: 5px;'></div>
+<div style="display:flex">
+<div id='combo${count}' style='margin-top: 5px;'></div>
+<div><button type='button' class='btn btn-success btn-sm' onclick="onAddItemComboElement('combo${count}')" style='margin-top: 5px;height:36px'>+</button></div>
+</div>
+<div id='textDropDown${count}' style='margin-top: 5px;'></div>
+<div id='comboExplainTexBox${count}' style='margin-top: 5px;'></div></div>`).insertAfter(`#field${count - 1}`);
+                    createDropDownRequired(count);
+                    createcomboExplainTexBox();
+                    createTextDropDown();
+                    createDropDown();
+                    updateCount++;
+                }
+            }
+            else  {
+                if (e.event.clientX <= 750) {
+
+                    $(`<div class='field DROPDOWN' id='field${count}'>
+
+<button id='parentComboButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteComboElement(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForDp${count}' style='margin-top: 5px;'></div>
+<div style="display:flex">
+<div id='combo${count}' style='margin-top: 5px;'></div>
+<div><button type='button' class='btn btn-success btn-sm' onclick="onAddItemComboElement('combo${count}')" style='margin-top: 5px;height:36px'>+</button></div>
+</div>
+<div id='textDropDown${count}' style='margin-top: 5px;'></div>
+<div id='comboExplainTexBox${count}' style='margin-top: 5px;'></div></div>
+`).insertAfter("#surveyQuestionDefinitionCode");
+                    createDropDownRequired(count);
+                    createcomboExplainTexBox();
+                    createTextDropDown();
+                    createDropDown();
+                    updateCount++;
+                }
+            }
+        }
+
+    function createDropDown() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+            $(`#combo${count}`).dxSelectBox({
+                dataSource: [],
+                onOpened: onOpenedSurveyQuestionDefinitionDropDown,
+                acceptCustomValue: true,
+                width: "400",
+                hoverStateEnabled: false,
+                openOnFieldClick: false,
+                showClearButton: true,
+                onValueChanged: onValueChangedSurveyQuestionDefinitionDropDown,
+            });
+            arrComboBox.push(`combo${count}`);
+    }
+
+    function createDropDownRequired(countOfDp) {
+        $(`#isRequiredForDp${countOfDp}`).dxCheckBox({
+            value: null,
+            text: "Zorunlu Mu",
+            width: "100%"
+        });
+    }
+
+    function onValueChangedSurveyQuestionDefinitionDropDown(e) {
+        if (e.value)
+            inputValue = e.value;
+        else {
+            return;
+        }
+
+        if (!e.value.replace(/\s/g, '').length) {
+            e.component.option("isValid", false);
+            return;
+        }
+        else {
+            e.component.option("isValid", true);
+        }
+    }
+
+    function onOpenedSurveyQuestionDefinitionDropDown(e) {
+
+        var listItems = e.component.content().find(".dx-list-item");
+        let Id = e.element[0].id;
+        let numberOfId = Id.substring(5);
+
+        if (listItems.length != 0) {
+                $(`.listItemsButton${numberOfId}`).remove();
+                for (var i = 0; i < listItems.length; i++) {
+                    listItems[i].style.width = "200px";
+                    listItems[i].style.pointerEvents = "none";
+                    listItems[i].style.marginTop = "10px";
+                    var parent1 = listItems[i].parentElement;
+                    var parent2 = parent1.parentElement;
+                    var parent3 = parent2.parentElement;
+                    var parent4 = parent3.parentElement;
+                    var parent5 = parent4.parentElement;
+                    var parent6 = parent5.parentElement;
+                    parent6.style.maxHeight = "none";
+                    parent6.style.minHeight = "150px";
+                    parent6.style.height = `300px`;
+                    $(`<div class='listItemsButton${numberOfId}' style='position:relative;left:299px; bottom:40px;'><button type='button' id='${Id}buttonNode${buttonCount}' onclick="onDeleteListItemsButton(this,${i},${Id},${numberOfId})" class='btn btn-danger btn-sm' style='margin-top: 5px;width:70px;'>-</button></div>`).insertAfter(listItems[i]);
+                    buttonCount++;
+                }
+            }
+        else {
+            if (listItems.length != 0) {
+                for (var i = 0; i < listItems.length; i++) {
+                    var parent1 = listItems[i].parentElement;
+                    var parent2 = parent1.parentElement;
+                    var parent3 = parent2.parentElement;
+                    var parent4 = parent3.parentElement;
+                    var parent5 = parent4.parentElement;
+                    var parent6 = parent5.parentElement;
+                    parent6.style.minHeight = "150px";
+                    $(`<div class='listItemsButton${numberOfId}' style='position:relative;left:299px; bottom:40px;'><button type='button' id='${Id}buttonNode${buttonCount}' onclick="onDeleteListItemsButton(this,${i},${Id},${numberOfId})" class='btn btn-danger btn-sm' style='margin-top: 5px;width:70px;'>-</button></div>`).insertAfter(listItems[i]);
+                    parent6.style.height = `${77 * listItems.length}`;
+                    buttonCount++;
+                }
+            }
+        }
+    }
+
+    function onDeleteListItemsButton(e, i, Id, numberOfId) {
+
+        var parentElement = e.parentElement;
+        var previousElement = parentElement.previousSibling;
+        parentElement.remove();
+        previousElement.remove();
+        var textValue = previousElement.innerText;
+        var sb = $(`#combo${numberOfId}`).dxSelectBox('instance');
+        sb.getDataSource().store().remove(textValue);
+
+    }
+
+    function onAddItemComboElement(comboId) {
+        var sb = $(`#${comboId}`).dxSelectBox('instance');
+        sb.getDataSource().store().insert(inputValue);
+        sb.getDataSource().reload();
+    }
+
+    function createTextDropDown() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#textDropDown${count}`).dxTextBox({
+            placeholder: 'Açıklama giriniz...',
+            onValueChanged: onValueChangedForText
+
+        })
+    }
+
+    function createcomboExplainTexBox() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#comboExplainTexBox${count}`).dxTextBox({
+            placeholder: 'Soruyu giriniz...',
+            onValueChanged: onValueChangedForText
+    });
+    }
+
+    function onValueChangedForText(e) {
+        if (!e.value.replace(/\s/g, '').length) {
+            e.component.option("isValid", false);
+            return;
+        }
+        else {
+            e.component.option("isValid", true);
+        }
+    }
+
+    function onDeleteComboElement(element) {
+            var str = element.id.toString();
+            var stringId = str.substring(17);
+            $(`#field${stringId}`).remove();
+            arrComboBox.forEach((value,index) => {
+                if (value == `combo${stringId}`) {
+                    arrComboBox =arrComboBox.filter(function (ele) {
+                        return ele != value;
+                    });
+                }
+            });
+    }
+    //
+
+
+    //TextBox
+    function surveyQuestionOnDragEndForTextBox(e) {
+        if (updateCount != 1) {
+            count = updateCount;
+        }
+        if ($(".field").length != 0) {
+            if (e.event.clientX <= 750) {
+                $(`<div class='field TEXTBOX' id='field${count}'>
+<button id='parentTextButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteTextElement(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForTxtBox${count}' style='margin-top: 5px;'></div>
+<div id='text${count}' style='margin-top: 5px;'></div>
+<div id='textLabel${count}' style='margin-top: 5px;'></div>
+<div id='textExplainTexBox${count}' style='margin-top: 5px;'></div>
+</div></div>`).insertAfter(`#field${count - 1}`);
+                createTextBoxRequired(count);
+                createTextExplainTexBox();
+                createTextForTextBox();
+                createTextBox();
+                updateCount++;
+            }
+        }
+        else {
+            if (e.event.clientX <= 750) {
+
+                $(`<div class='field TEXTBOX'  id='field${count}'>
+<button id='parentTextButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteTextElement(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForTxtBox${count}' style='margin-top: 5px;'></div>
+<div id='text${count}' style='margin-top: 5px;'></div>
+<div id='textLabel${count}' style='margin-top: 5px;'></div>
+<div id='textExplainTexBox${count}' style='margin-top: 5px;'></div>
+</div></div>`).insertAfter("#surveyQuestionDefinitionCode");
+                createTextBoxRequired(count);
+                createTextExplainTexBox();
+                createTextForTextBox();
+                createTextBox();
+                updateCount++;
+            }
+        }
+    }
+
+    function createTextForTextBox() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#textLabel${count}`).dxTextBox({
+            placeholder: 'Açıklama giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function createTextExplainTexBox() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#textExplainTexBox${count}`).dxTextBox({
+            placeholder: 'Soruyu giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function createTextBox() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#text${count}`).dxTextBox({
+        });
+        arrTextBox.push(`text${count}`);
+    }
+
+    function createTextBoxRequired(countOfTextBox) {
+        $(`#isRequiredForTxtBox${countOfTextBox}`).dxCheckBox({
+            value: null,
+            text: "Zorunlu Mu",
+            width: "100%"
+        });
+    }
+
+    function onDeleteTextElement(element) {
+            var str = element.id.toString();
+            var stringId = str.substring(16);
+            $(`#field${stringId}`).remove();
+            arrTextBox.forEach((value, index) => {
+                if (value == `text${stringId}`) {
+                    arrTextBox = arrTextBox.filter(function (ele) {
+                        return ele != value;
+                    });
+                }
+            });
+    }
+    //
+
+
+    //Radio
+    function surveyQuestionOnDragEndForRadioButton(e) {
+        console.log(updateCount);
+        if (updateCount != 1) {
+            count = updateCount;
+        }
+        if ($(".field").length != 0) {
+            if (e.event.clientX <= 750) {
+                $(`<div class='field RADIOGROUP' id='field${count}' >
+<button id='parentRadioButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteRadioElement(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForRadioGroup${count}' style='margin-top: 5px;'></div>
+<div id='radioExplainTexBox${count}' style='margin-top: 5px;'></div>
+<div style="display:flex;">
+<div id='addRadioItemTexBox${count}' style='margin-top: 5px;'></div>
+<button id='parentRadioAddedItemButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onAddedRadioItemElement(this,'addRadioItemTexBox${count}','radio${count}')" style="width: 66px;height: 33px;margin-top: 5px;">+</button>
+</div>
+<div id='radio${count}' style='margin-top: 5px;'></div>
+</div>`).insertAfter(`#field${count - 1}`);
+                createRadioGroupRequired(count);
+                createRadioExplainTexBox();
+                addRadioItemTexBox();
+                createRadioBox();
+                updateCount++;
+            }
+        }
+        else {
+            if (e.event.clientX <= 750) {
+
+                $(`<div class='field RADIOGROUP' id='field${count}'>
+<button id='parentRadioButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteRadioElement(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForRadioGroup${count}' style='margin-top: 5px;'></div>
+<div id='radioExplainTexBox${count}' style='margin-top: 5px;'></div>
+<div style="display:flex;">
+<div id='addRadioItemTexBox${count}' style='margin-top: 5px;'></div>
+<button id='parentRadioAddedItemButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onAddedRadioItemElement(this,'addRadioItemTexBox${count}','radio${count}')" style="width: 66px;height: 33px;margin-top: 5px;">+</button>
+</div>
+<div id='radio${count}' style='margin-top: 5px;'></div>
+</div>`).insertAfter("#surveyQuestionDefinitionCode");
+                createRadioGroupRequired(count);
+                createRadioExplainTexBox();
+                addRadioItemTexBox();
+                createRadioBox();
+                updateCount++;
+            }
+        }
+    }
+
+    function addRadioItemTexBox() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#addRadioItemTexBox${count}`).dxTextBox({
+            placeholder: 'Değer Giriniz..',
+        });
+    }
+
+    function createRadioExplainTexBox() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#radioExplainTexBox${count}`).dxTextBox({
+            placeholder: 'Soruyu giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function createRadioBox() {
+        console.log(createRadioBox);
+
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+
+        $(`#radio${count}`).dxRadioGroup({
+            dataSource: []
+        });
+        arrRadioBox.push(`radio${count}`);
+    }
+
+    function createRadioGroupRequired(countOfRadioGroup) {
+        $(`#isRequiredForRadioGroup${countOfRadioGroup}`).dxCheckBox({
+            value: null,
+            text: "Zorunlu Mu",
+            width: "100%"
+        });
+    }
+
+    function onAddedRadioItemElement(e, addRadioItemTexBoxId, radioId) {
+        let controlOfSameRecord = 0;
+        var sb = $(`#${radioId}`).dxRadioGroup('instance');
+        var textValue = $(`#${addRadioItemTexBoxId}`).dxTextBox("instance").option("value");
+        //var items = sb.getDataSource()._items;
+
+
+        if (arrRadioItemValues.length != 0) {
+            arrRadioItemValues.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == radioId) {
+                        if (value2 == textValue) {
+                            if (value2.replace(/\s/g, '').toUpperCase() == textValue.replace(/\s/g, '').toUpperCase()) {
+                                controlOfSameRecord++;
+                                DevExpress.ui.notify({
+                                    message: `Aynı değerden ekleyemezsiniz`,
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+
+        if (controlOfSameRecord != 0) {
+            return;
+        }
+        sb.getDataSource().store().insert(textValue);
+        sb.getDataSource().reload();
+        var all = sb.itemElements();
+        for (var i = 0; i < all.length; i++) {
+            all[i].style.width = "100%";
+            var children1 = all[i].children;
+            children1[0].style.width = "10px";
+            children1[1].style.marginTop = "3px";
+            var parent = all[i].parentNode;
+            var wrapper = document.createElement('div');
+            wrapper.style.cssText = 'display:flex;';
+            wrapper.id=`radioDeleteButton${i}`
+            parent.replaceChild(wrapper, all[i]);
+            wrapper.appendChild(all[i]);
+            $(`<button type='button'
+class='btn btn-danger btn-sm'
+style='margin-bottom:1px;'
+onclick="onClickDeleteRadioButtonItem('radioDeleteButton${i}','${radioId}','${children1[1].innerHTML}')" >-</button>`).insertAfter(all[i]);
+        }
+        var obj = {
+            [radioId]: textValue,
+        }
+        arrRadioItemValues.push(obj);
+    }
+
+    function onDeleteRadioElement(element) {
+        var str = element.id.toString();
+        var stringId = str.substring(17);
+        $(`#field${stringId}`).remove();
+
+        arrRadioBox.forEach((value, index) => {
+            if (value == `radio${stringId}`) {
+                arrRadioBox = arrRadioBox.filter(function (ele) {
+                    return ele != value;
+                });
+            }
+        });
+        if (arrRadioItemValues.length != 0) {
+            arrRadioItemValues.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == `radio${stringId}`) {
+                            arrRadioItemValues = arrRadioItemValues.filter(function (ele) {
+                                return ele != value;
+                            });
+                    }
+                }
+            });
+        }
+    }
+
+    function onClickDeleteRadioButtonItem(radioDeleteButtonId, radioId, textValue) {
+        var sb = $(`#${radioId}`).dxRadioGroup('instance');
+        sb.getDataSource().store().remove(textValue);
+        $(`#${radioDeleteButtonId}`).remove();
+
+        if (arrRadioItemValues.length != 0) {
+            arrRadioItemValues.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == radioId) {
+                        if (value2 == textValue) {
+                            arrRadioItemValues = arrRadioItemValues.filter(function (ele) {
+                                return ele != value;
+                            });
+                        }
+                    }
+                }
+            });
+        }
+    }
+    //
+
+
+    //CheckBox
+    function surveyQuestionOnDragEndForCheckBox(e) {
+        if (updateCount != 1) {
+            count = updateCount;
+        }
+        
+
+        if ($(".field").length != 0) {
+            if (e.event.clientX <= 750) {
+                $(`<div class='field CHECKBOX' id='field${count}' ><div class="parentCheckBoxClass" id="parentCheckBox${count}">
+<button id='parentCheckBoxButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteCheckBoxElement(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForCheckBox${count}' style='margin-top: 5px;'></div>
+<div id='createCheckboxExplainTexBox${count}' style='margin-top: 5px;'></div>
+
+<div id='checkBoxDisplay${count}' style="display:flex;">
+<div id='addCheckboxItemTexBox${count}' style='margin-top: 5px;'></div>
+<button id='parentCheckBoxAddedItemButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onAddedCheckBoxItemElement(${count})" style="width: 66px;height: 33px;margin-top: 5px;">+</button>
+</div>
+</div>
+</div>
+`).insertAfter(`#field${count - 1}`);
+                createCheckBoxRequired(count);
+                createCheckboxExplainTexBox();
+                addCheckboxItemTexBox();
+                updateCount++;
+            }
+        }
+        else {
+            if (e.event.clientX <= 750) {
+                $(`<div class='field CHECKBOX' id='field${count}' ><div class="parentCheckBoxClass" id="parentCheckBox${count}">
+<button id='parentCheckBoxButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onDeleteCheckBoxElement(this)" style="width: 66px;height: 33px;margin-top: 5px;">Kaldır</button>
+<div id='isRequiredForCheckBox${count}' style='margin-top: 5px;'></div>
+<div id='createCheckboxExplainTexBox${count}' style='margin-top: 5px;'></div>
+
+<div id='checkBoxDisplay${count}' style="display:flex;">
+<div id='addCheckboxItemTexBox${count}' style='margin-top: 5px;'></div>
+<button id='parentCheckBoxAddedItemButton${count}' type="button" class="btn btn-primary btn-sm" onclick="onAddedCheckBoxItemElement(${count})" style="width: 66px;height: 33px;margin-top: 5px;">+</button>
+</div>
+</div>
+</div>`).insertAfter("#surveyQuestionDefinitionCode");
+                createCheckBoxRequired(count);
+                createCheckboxExplainTexBox();
+                addCheckboxItemTexBox();
+                updateCount++;
+            }
+        }
+    }
+
+    function createCheckboxExplainTexBox() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#createCheckboxExplainTexBox${count}`).dxTextBox({
+            placeholder: 'Soruyu giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+        arrCreatedFieldCheckbox.push(count);
+    }
+
+    function addCheckboxItemTexBox() {
+        if (updateCount != 0) {
+            count = updateCount;
+        }
+        $(`#addCheckboxItemTexBox${count}`).dxTextBox({
+            placeholder: 'Değer Giriniz..',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function createCheckBoxRequired(countOfCheckBox) {
+        $(`#isRequiredForCheckBox${countOfCheckBox}`).dxCheckBox({
+            value: null,
+            text: "Zorunlu Mu",
+            width: "100%"
+        });
+    }
+
+    function onAddedCheckBoxItemElement(valueOfCount) {
+        let controlOfSameRecordForCheckBox = 0;
+        var textValue = $(`#addCheckboxItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+        if (checkBoxItemValues.length != 0) {
+            checkBoxItemValues.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == "field" + valueOfCount) {
+                        if (value2 ==textValue ){
+                            if (value2.replace(/\s/g, '').toUpperCase() == textValue.replace(/\s/g, '').toUpperCase()) {
+                                controlOfSameRecordForCheckBox++;
+                                DevExpress.ui.notify({
+                                    message: `Aynı değerden ekleyemezsiniz`,
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+        if (controlOfSameRecordForCheckBox != 0) {
+            return;
+        }                
+
+        if (sayacUpdate > sayac) {
+            sayac = sayacUpdate;
+        }
+        
+        var toplam = valueOfCount + sayac;
+        if ($(`#field${valueOfCount}`).find(".displayFlexForDeleteButton").length == 0) {
+                $(`<div id='displayFlexForDeleteButton${sayac}' class='displayFlexForDeleteButton' style='margin-top: 5px;display:flex;'></div>`).insertAfter(`#checkBoxDisplay${valueOfCount}`);
+                $(`#displayFlexForDeleteButton${sayac}`).append(`<div id='checkBox${sayac}' style='margin-top: 5px;'></div>`)
+                $(`#displayFlexForDeleteButton${sayac}`).append(`<button id='deleteItemInCheckbox${sayac}' onclick='deleteItemForCheckBox(${sayac},${valueOfCount})' class='btn btn-danger btn-sm' style='margin-top: 5px;'>-</button>`)
+        }
+        else {
+            let lastSayac = 0;
+            if (arrFieldCheckBox.length != 0) {
+                arrFieldCheckBox.forEach((value) => {
+                    for (var [key, value2] of Object.entries(value)) {
+                        if (key == "field" + valueOfCount) {
+                            lastSayac = value2;
+                        }
+                    }
+                });
+            }
+            $(`<div id='displayFlexForDeleteButton${sayac}' class='displayFlexForDeleteButton' style='margin-top: 5px;display:flex;'></div>`).insertAfter(`#displayFlexForDeleteButton${lastSayac}`);
+            $(`#displayFlexForDeleteButton${sayac}`).append(`<div id='checkBox${sayac}' style='margin-top: 5px;'></div>`)
+            $(`#displayFlexForDeleteButton${sayac}`).append(`<button id='deleteItemInCheckbox${sayac}' onclick='deleteItemForCheckBox(${sayac},${valueOfCount})' class='btn btn-danger btn-sm' style='margin-top: 5px;'>-</button>`)
+        }
+
+        var obj = {
+            [`field${valueOfCount}`]: sayac,
+        }
+
+        arrFieldCheckBox.push(obj);
+        createCheckBox(valueOfCount, toplam, sayac);
+        sayacUpdate++;
+        sayac++;
+               
+        
+    }
+
+    function createCheckBox(valueOfCount, toplam, sayac) {
+
+        var textValue = $(`#addCheckboxItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+        $(`#checkBox${sayac}`).dxCheckBox({
+            value: null,
+            text: textValue,
+            width:"100%"
+        });
+
+        var obj3 = {
+            ["field"]: `field${valueOfCount}`,
+        }
+
+        var obj2 = {
+                ["data"]: textValue,
+        }
+        obj3.obj2 = obj2;
+
+        var a = Object.assign(obj3);
+
+        arrCheckBox.push(a);
+        var obj = {
+            [`field${valueOfCount}`]: textValue,
+        }
+
+        checkBoxItemValues.push(obj);
+    }
+
+    function onDeleteCheckBoxElement(element) {
+        var str = element.id.toString();
+        var stringId = str.substring(20);
+        $(`#field${stringId}`).remove();
+        arrCheckBox = [];
+    }
+
+    function deleteItemForCheckBox(value,fieldNumber) {
+        $(`#displayFlexForDeleteButton${value}`).remove();
+        if (checkBoxItemValues.length != 0) {
+            checkBoxItemValues.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == "field" + fieldNumber) {
+                        checkBoxItemValues = checkBoxItemValues.filter(function (ele) {
+                            return ele != value;
+                        });
+                    }
+                }
+            });
+        }
+    }
+    //
+
+
+
+    //Update Fonksiyonlarının başladığı yer
+
+    //DropDown
+    function createDropDownUpdate(dataSoruce) {
+        console.log("createDropDownUpdate");
+        $(`#combo${updateCount}`).dxSelectBox({
+            dataSource: dataSoruce,
+            onOpened: onOpenedSurveyQuestionDefinitionDropDownUpdate,
+            acceptCustomValue: true,
+            width: "400",
+            hoverStateEnabled: false,
+            openOnFieldClick: false,
+            showClearButton: true,
+            onValueChanged: onValueChangedSurveyQuestionDefinitionDropDownUpdate,
+        });
+        arrComboBoxUpdate.push(`combo${updateCount}`);
+    }
+
+    function createTextDropDownUpdate(Label) {
+        console.log("Label", Label);
+        console.log(typeof Label);
+        $(`#textDropDown${updateCount}`).dxTextBox({
+            value: Label,
+            placeholder: 'Açıklama giriniz...',
+            onValueChanged: onValueChangedForText
+        })
+    }
+
+    function createcomboExplainTexBoxUpdate(Question) {
+        $(`#comboExplainTexBox${updateCount}`).dxTextBox({
+            value: Question,
+            placeholder: 'Soruyu giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function createDropDownRequiredUpdate(countOfDp) {
+        $(`#isRequiredForDp${countOfDp}`).dxCheckBox({
+            value: null,
+            text: "Zorunlu Mu",
+            width: "100%"
+        });
+    }
+
+    function onValueChangedSurveyQuestionDefinitionDropDownUpdate(e) {
+        if (e.value)
+            inputValue = e.value;
+        else {
+            return;
+        }
+
+        if (!e.value.replace(/\s/g, '').length) {
+            e.component.option("isValid", false);
+            return;
+        }
+        else {
+            e.component.option("isValid", true);
+        }
+    }
+
+    function onOpenedSurveyQuestionDefinitionDropDownUpdate(e) {
+
+        var listItems = e.component.content().find(".dx-list-item");
+        let Id = e.element[0].id;
+        let numberOfId = Id.substring(5);
+
+        if (listItems.length != 0) {
+            $(`.listItemsButton${numberOfId}`).remove();
+            for (var i = 0; i < listItems.length; i++) {
+                listItems[i].style.width = "200px";
+                listItems[i].style.pointerEvents = "none";
+                listItems[i].style.marginTop = "10px";
+                var parent1 = listItems[i].parentElement;
+                var parent2 = parent1.parentElement;
+                var parent3 = parent2.parentElement;
+                var parent4 = parent3.parentElement;
+                var parent5 = parent4.parentElement;
+                var parent6 = parent5.parentElement;
+                parent6.style.maxHeight = "none";
+                parent6.style.minHeight = "150px";
+                parent6.style.height = `300px`;
+                $(`<div class='listItemsButton${numberOfId}' style='position:relative;left:299px; bottom:40px;'><button type='button' id='${Id}buttonNode${buttonCount}' onclick="onDeleteListItemsButton(this,${i},${Id},${numberOfId})" class='btn btn-danger btn-sm' style='margin-top: 5px;width:70px;'>-</button></div>`).insertAfter(listItems[i]);
+                buttonCount++;
+            }
+        }
+        else {
+            if (listItems.length != 0) {
+                for (var i = 0; i < listItems.length; i++) {
+                    var parent1 = listItems[i].parentElement;
+                    var parent2 = parent1.parentElement;
+                    var parent3 = parent2.parentElement;
+                    var parent4 = parent3.parentElement;
+                    var parent5 = parent4.parentElement;
+                    var parent6 = parent5.parentElement;
+                    parent6.style.minHeight = "150px";
+                    $(`<div class='listItemsButton${numberOfId}' style='position:relative;left:299px; bottom:40px;'><button type='button' id='${Id}buttonNode${buttonCount}' onclick="onDeleteListItemsButton(this,${i},${Id},${numberOfId})" class='btn btn-danger btn-sm' style='margin-top: 5px;width:70px;'>-</button></div>`).insertAfter(listItems[i]);
+                    parent6.style.height = `${77 * listItems.length}`;
+                    buttonCount++;
+                }
+            }
+        }
+    }
+
+    function onDeleteComboElementUpdate(element) {
+        var str = element.id.toString();
+        var stringId = str.substring(17);
+        $(`#field${stringId}`).remove();
+        arrComboBoxUpdate.forEach((value, index) => {
+            if (value == `combo${stringId}`) {
+                arrComboBoxUpdate = arrComboBoxUpdate.filter(function (ele) {
+                    return ele != value;
+                });
+            }
+        });
+    }
+    //
+
+    //TextBox
+    function createTextBoxRequiredUpdate(countOfTextBox) {
+        $(`#isRequiredForTxtBox${countOfTextBox}`).dxCheckBox({
+            value: null,
+            text: "Zorunlu Mu",
+            width: "100%"
+        });
+    }
+
+    function createTextExplainTexBoxUpdate(Question) {
+        $(`#textExplainTexBox${updateCount}`).dxTextBox({
+            value: Question,
+            placeholder: 'Soruyu giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function createTextForTextBoxUpdate(Label) {
+        $(`#textLabel${updateCount}`).dxTextBox({
+            value: Label,
+            placeholder: 'Açıklama giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function createTextBoxUpdate() {
+        $(`#text${updateCount}`).dxTextBox({
+        });
+        arrTextBox.push(`text${updateCount}`);
+    }
+
+    function onDeleteTextElementUpdate(element) {
+        var str = element.id.toString();
+        var stringId = str.substring(16);
+        $(`#field${stringId}`).remove();
+        arrTextBoxUpdate.forEach((value, index) => {
+            if (value == `text${stringId}`) {
+                arrTextBoxUpdate = arrTextBoxUpdate.filter(function (ele) {
+                    return ele != value;
+                });
+            }
+        });
+    }
+    //
+
+    //Radio
+    function createRadioGroupRequiredUpdate(countOfRadioGroup) {
+        $(`#isRequiredForRadioGroup${countOfRadioGroup}`).dxCheckBox({
+            value: null,
+            text: "Zorunlu Mu",
+            width: "100%"
+        });
+    }
+
+    function createRadioExplainTexBoxUpdate(Question) {
+        $(`#radioExplainTexBox${updateCount}`).dxTextBox({
+            value: Question,
+            placeholder: 'Soruyu giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function addRadioItemTexBoxUpdate(Label) {
+        $(`#addRadioItemTexBox${updateCount}`).dxTextBox({
+            value: "",
+            placeholder: 'Değer Giriniz..',
+        });
+    }
+
+    function createRadioBoxUpdate(dataSource) {
+        $(`#radio${updateCount}`).dxRadioGroup({
+            dataSource: dataSource,
+            onInitialized: onInitializedRadioBoxUpdate
+        });
+        var sb = $(`#radio${updateCount}`).dxRadioGroup('instance');
+
+        //sb.getDataSource().store().insert(textValue);
+        sb.getDataSource().reload();
+        var all = sb.itemElements();
+        for (var i = 0; i < all.length; i++) {
+            all[i].style.width = "100%";
+            var children1 = all[i].children;
+            children1[0].style.width = "10px";
+            children1[1].style.marginTop = "3px";
+            var parent = all[i].parentNode;
+            var wrapper = document.createElement('div');
+            wrapper.style.cssText = 'display:flex;';
+            wrapper.id = `radioDeleteButtonUpdate${i}`
+            parent.replaceChild(wrapper, all[i]);
+            wrapper.appendChild(all[i]);
+            $(`<button type='button'
+class='btn btn-danger btn-sm'
+style='margin-bottom:1px;'
+onclick="onClickDeleteRadioButtonItemUpdate('radioDeleteButtonUpdate${i}','radio${updateCount}','${children1[1].innerHTML}')" >-</button>`).insertAfter(all[i]);
+        }
+        //var obj = {
+        //    [updateCount]: textValue,
+        //}
+        //arrRadioItemValuesUpdate.push(obj);
+
+
+
+        arrRadioBoxUpdate.push(`radio${updateCount}`);
+    }
+
+    function onInitializedRadioBoxUpdate(e) {
+        console.log("onInitializedRadioBoxUpdate",e);
+    }
+
+    function onDeleteRadioElementUpdate(element) {
+        var str = element.id.toString();
+        var stringId = str.substring(17);
+        $(`#field${stringId}`).remove();
+
+        arrRadioBoxUpdate.forEach((value, index) => {
+            if (value == `radio${stringId}`) {
+                arrRadioBoxUpdate = arrRadioBoxUpdate.filter(function (ele) {
+                    return ele != value;
+                });
+            }
+        });
+        if (arrRadioItemValuesUpdate.length != 0) {
+            arrRadioItemValuesUpdate.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == `radio${stringId}`) {
+                        arrRadioItemValuesUpdate = arrRadioItemValuesUpdate.filter(function (ele) {
+                            return ele != value;
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    function onAddedRadioItemElementUpdate(e, addRadioItemTexBoxId, radioId) {
+        let controlOfSameRecord = 0;
+        var sb = $(`#${radioId}`).dxRadioGroup('instance');
+        var textValue = $(`#${addRadioItemTexBoxId}`).dxTextBox("instance").option("value");
+
+        if (arrRadioItemValuesUpdate.length != 0) {
+            arrRadioItemValuesUpdate.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == radioId) {
+                        if (value2 == textValue) {
+                            if (value2.replace(/\s/g, '').toUpperCase() == textValue.replace(/\s/g, '').toUpperCase()) {
+                                controlOfSameRecord++;
+                                DevExpress.ui.notify({
+                                    message: `Aynı değerden ekleyemezsiniz`,
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+
+        if (controlOfSameRecord != 0) {
+            return;
+        }
+        sb.getDataSource().store().insert(textValue);
+        sb.getDataSource().reload();
+        var all = sb.itemElements();
+        for (var i = 0; i < all.length; i++) {
+            all[i].style.width = "100%";
+            var children1 = all[i].children;
+            children1[0].style.width = "10px";
+            children1[1].style.marginTop = "3px";
+            var parent = all[i].parentNode;
+            var wrapper = document.createElement('div');
+            wrapper.style.cssText = 'display:flex;';
+            wrapper.id = `radioDeleteButton${i}`
+            parent.replaceChild(wrapper, all[i]);
+            wrapper.appendChild(all[i]);
+            $(`<button type='button'
+class='btn btn-danger btn-sm'
+style='margin-bottom:1px;'
+onclick="onClickDeleteRadioButtonItemUpdate('radioDeleteButton${i}','${radioId}','${children1[1].innerHTML}')" >-</button>`).insertAfter(all[i]);
+        }
+        var obj = {
+            [radioId]: textValue,
+        }
+        arrRadioItemValuesUpdate.push(obj);
+    }
+
+    function onClickDeleteRadioButtonItemUpdate(radioDeleteButtonId, radioId, textValue) {
+        var sb = $(`#${radioId}`).dxRadioGroup('instance');
+        sb.getDataSource().store().remove(textValue);
+        $(`#${radioDeleteButtonId}`).remove();
+        if (arrRadioItemValuesUpdate.length != 0) {
+            arrRadioItemValuesUpdate.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == radioId) {
+                        if (value2 == textValue) {
+                            arrRadioItemValuesUpdate = arrRadioItemValuesUpdate.filter(function (ele) {
+                                return ele != value;
+                            });
+                        }
+                    }
+                }
+            });
+        }
+    }
+    //
+
+    //CheckBox
+    function createCheckBoxRequiredUpdate(countOfCheckBox) {
+        $(`#isRequiredForCheckBox${countOfCheckBox}`).dxCheckBox({
+            value: null,
+            text: "Zorunlu Mu",
+            width: "100%"
+        });
+    }
+
+    function createCheckboxExplainTexBoxUpdate(Question) {
+        $(`#createCheckboxExplainTexBox${updateCount}`).dxTextBox({
+            value: Question,
+            placeholder: 'Soruyu giriniz...',
+            onValueChanged: onValueChangedForText
+        });
+        arrCreatedFieldCheckboxUpdate.push(updateCount);
+    }
+
+    function addCheckboxItemTexBoxUpdate(Label) {
+        $(`#addCheckboxItemTexBox${updateCount}`).dxTextBox({
+            placeholder: 'Değer Giriniz..',
+            onValueChanged: onValueChangedForText
+        });
+    }
+
+    function onDeleteCheckBoxElementUpdate(element) {
+        var str = element.id.toString();
+        var stringId = str.substring(20);
+        $(`#field${stringId}`).remove();
+        arrCheckBoxUpdate = [];
+    }
+
+    function onAddedCheckBoxItemElementUpdate(valueOfCount, Datas, isTrue) {
+
+        if (isTrue) {
+            Datas.forEach((value, index) => {
+                if ($(`#field${valueOfCount}`).find(".displayFlexForDeleteButton").length == 0) {
+                    $(`<div id='displayFlexForDeleteButton${sayacUpdate}' class='displayFlexForDeleteButton' style='margin-top: 5px;display:flex;'></div>`).insertAfter(`#checkBoxDisplay${valueOfCount}`);
+                    $(`#displayFlexForDeleteButton${sayacUpdate}`).append(`<div id='checkBox${sayacUpdate}' style='margin-top: 5px;'></div>`)
+                    $(`#displayFlexForDeleteButton${sayacUpdate}`).append(`<button id='deleteItemInCheckbox${sayacUpdate}' onclick='deleteItemForCheckBoxUpdate(${sayacUpdate},${valueOfCount})' class='btn btn-danger btn-sm' style='margin-top: 5px;'>-</button>`)
+                }
+                else {
+                    let lastsayacUpdate = 0;
+                    if (arrFieldCheckBoxUpdate.length != 0) {
+                        arrFieldCheckBoxUpdate.forEach((value) => {
+                            for (var [key, value2] of Object.entries(value)) {
+                                if (key == "field" + valueOfCount) {
+                                    lastsayacUpdate = value2;
+                                }
+                            }
+                        });
+                    }
+                    $(`<div id='displayFlexForDeleteButton${sayacUpdate}' class='displayFlexForDeleteButton' style='margin-top: 5px;display:flex;'></div>`).insertAfter(`#displayFlexForDeleteButton${lastsayacUpdate}`);
+                    $(`#displayFlexForDeleteButton${sayacUpdate}`).append(`<div id='checkBox${sayacUpdate}' style='margin-top: 5px;'></div>`)
+                    $(`#displayFlexForDeleteButton${sayacUpdate}`).append(`<button id='deleteItemInCheckbox${sayacUpdate}' onclick='deleteItemForCheckBoxUpdate(${sayacUpdate},${valueOfCount})' class='btn btn-danger btn-sm' style='margin-top: 5px;'>-</button>`)
+                }
+
+                var obj = {
+                    [`field${valueOfCount}`]: sayacUpdate,
+                }
+
+                arrFieldCheckBoxUpdate.push(obj);
+
+                createCheckBoxUpdate(valueOfCount, value ,sayacUpdate);
+                sayacUpdate++;
+            })
+        }
+    }
+
+    function onAddedCheckBoxItemElementUpdateV2(valueOfCount) {
+        let controlOfSameRecordForCheckBox = 0;
+        var textValue = $(`#addCheckboxItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+
+        if (checkBoxItemValuesUpdate.length != 0) {
+            checkBoxItemValuesUpdate.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == "field" + valueOfCount) {
+                        if (value2 == textValue) {
+                            if (value2.replace(/\s/g, '').toUpperCase() == textValue.replace(/\s/g, '').toUpperCase()) {
+                                controlOfSameRecordForCheckBox++;
+                                DevExpress.ui.notify({
+                                    message: `Aynı değerden ekleyemezsiniz`,
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+        if (controlOfSameRecordForCheckBox != 0) {
+            return;
+        }
+
+        if (sayacUpdate > sayac) {
+            sayac = sayacUpdate;
+        }
+        //var toplam = valueOfCount + sayac;
+        if ($(`#field${valueOfCount}`).find(".displayFlexForDeleteButton").length == 0) {
+            $(`<div id='displayFlexForDeleteButton${sayac}' class='displayFlexForDeleteButton' style='margin-top: 5px;display:flex;'></div>`).insertAfter(`#checkBoxDisplay${valueOfCount}`);
+            $(`#displayFlexForDeleteButton${sayac}`).append(`<div id='checkBox${sayac}' style='margin-top: 5px;'></div>`)
+            $(`#displayFlexForDeleteButton${sayac}`).append(`<button id='deleteItemInCheckbox${sayac}' onclick='deleteItemForCheckBoxUpdate(${sayac},${valueOfCount})' class='btn btn-danger btn-sm' style='margin-top: 5px;'>-</button>`)
+        }
+        else {
+            let lastSayac = 0;
+            if (arrFieldCheckBoxUpdate.length != 0) {
+                arrFieldCheckBoxUpdate.forEach((value) => {
+                    for (var [key, value2] of Object.entries(value)) {
+                        if (key == "field" + valueOfCount) {
+                            lastSayac = value2;
+                        }
+                    }
+                });
+            }
+            $(`<div id='displayFlexForDeleteButton${sayac}' class='displayFlexForDeleteButton' style='margin-top: 5px;display:flex;'></div>`).insertAfter(`#displayFlexForDeleteButton${lastSayac}`);
+            $(`#displayFlexForDeleteButton${sayac}`).append(`<div id='checkBox${sayac}' style='margin-top: 5px;'></div>`)
+            $(`#displayFlexForDeleteButton${sayac}`).append(`<button id='deleteItemInCheckbox${sayac}' onclick='deleteItemForCheckBoxUpdate(${sayac},${valueOfCount})' class='btn btn-danger btn-sm' style='margin-top: 5px;'>-</button>`)
+        }
+
+        var obj = {
+            [`field${valueOfCount}`]: sayac,
+        }
+
+        arrFieldCheckBoxUpdate.push(obj);
+
+        createCheckBoxUpdate(valueOfCount, "", sayac);
+        sayacUpdate++;
+    }
+
+    function deleteItemForCheckBoxUpdate(value, fieldNumber) {
+        $(`#displayFlexForDeleteButton${value}`).remove();
+        if (checkBoxItemValuesUpdate.length != 0) {
+            checkBoxItemValuesUpdate.forEach((value) => {
+                for (var [key, value2] of Object.entries(value)) {
+                    if (key == "field" + fieldNumber) {
+                        checkBoxItemValuesUpdate = checkBoxItemValuesUpdate.filter(function (ele) {
+                            return ele != value;
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    function createCheckBoxUpdate(valueOfCount, textValueFrom, sayac) {
+        var textValue = $(`#addCheckboxItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+        if (textValue == "") {
+            $(`#checkBox${sayac}`).dxCheckBox({
+                value: null,
+                text: textValueFrom,
+                width: "100%"
+            });
+            textValue = textValueFrom;
+        }
+
+        else {
+            $(`#checkBox${sayac}`).dxCheckBox({
+                value: null,
+                text: textValue,
+                width: "100%"
+            });
+        }
+
+        var obj3 = {
+            ["field"]: `field${valueOfCount}`,
+        }
+
+        var obj2 = {
+            ["data"]: textValue,
+        }
+        obj3.obj2 = obj2;
+
+        var a = Object.assign(obj3);
+
+        arrCheckBoxUpdate.push(a);
+        var obj = {
+            [`field${valueOfCount}`]: textValue,
+        }
+        checkBoxItemValuesUpdate.push(obj);
+    }
+    //
+
+
+    //Devexpress update komutu çalışmadığı için bu fonksiyondan update işlemlerini yapıyoruz
+    function updateForm() {        
+        var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+                for (var i = 0; i < $(".field").length; i++) {
+                    arrOrder.push($(".field")[i].classList[1]);
+                }
+                for (var i = 0; i < arrOrder.length; i++) {                    
+                    if (arrOrder[i] == "CHECKBOXUPDATE") {                        
+                        arrOrder[i] = "CHECKBOX";
+                    }
+                }
+
+
+                if (arrComboBoxUpdate != 0) {
+                    arrComboBoxUpdate.forEach((value, index) => {
+                        console.log("arrComboBoxUpdate");
+                        let objectSurveyAnswerDto = new Object();
+                        let DropDownDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var combo = $(`#${value}`).dxSelectBox("instance");
+                        combo.getDataSource().reload();
+                        var Datas = combo.getDataSource().items();
+                        var Label = $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForDp${valueOfCount}`).dxCheckBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((Label.replace(/\s/g, '').length) && (Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            return;
+                        }
+
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+                        objectSurveyAnswerDto.DropDownDtoObj = DropDownDto;
+                        objectSurveyAnswerDto.DropDownDtoObj.Datas = Datas;
+                        objectSurveyAnswerDto.DropDownDtoObj.Label = Label;
+                        objectSurveyAnswerDto.DropDownDtoObj.Question = Question;
+                        objectSurveyAnswerDto.DropDownDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 2;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+        }
+
+                if (arrComboBox.length != 0) {
+                    arrComboBox.forEach((value, index) => {
+                        console.log("deneme123456");
+                        let objectSurveyAnswerDto = new Object();
+                        let DropDownDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var combo = $(`#${value}`).dxSelectBox("instance");
+                        combo.getDataSource().reload();
+                        var Datas = combo.getDataSource().items();
+                        var Label = $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForDp${valueOfCount}`).dxCheckBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((!Label.replace(/\s/g, '').length) && Datas.length != 0) {
+                            errorCount++;
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            return;
+                        }
+                        else if ((Label.replace(/\s/g, '').length) && (Question.replace(/\s/g, '').length) && Datas.length == 0) {
+                            errorCount++;
+                            $(`#${value}`).dxSelectBox("instance").option("isValid", false);
+                            return;
+                        }
+
+                        else if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textDropDown${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#comboExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+                        objectSurveyAnswerDto.DropDownDtoObj = DropDownDto;
+                        objectSurveyAnswerDto.DropDownDtoObj.Datas = Datas;
+                        objectSurveyAnswerDto.DropDownDtoObj.Label = Label;
+                        objectSurveyAnswerDto.DropDownDtoObj.Question = Question;
+                        objectSurveyAnswerDto.DropDownDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 2;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+        }
+
+                if (arrTextBoxUpdate.length != 0) {
+
+                    arrTextBoxUpdate.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let TextBoxDto = new Object();
+                        var valueOfCount = value.substring(4);
+                        var Label = $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForTxtBox${valueOfCount}`).dxCheckBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+                        objectSurveyAnswerDto.TextBoxDtoObj = TextBoxDto;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Label = Label;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Question = Question;
+                        objectSurveyAnswerDto.TextBoxDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 4;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+
+                    });
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrTextBox.length != 0) {
+
+                    arrTextBox.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let TextBoxDto = new Object();
+                        var valueOfCount = value.substring(4);
+                        var Label = $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForTxtBox${valueOfCount}`).dxCheckBox("instance").option("value");
+
+                        if ((!Label.replace(/\s/g, '').length) && (!Question.replace(/\s/g, '').length)) {
+                            $(`#textLabel${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            $(`#textExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+                        objectSurveyAnswerDto.TextBoxDtoObj = TextBoxDto;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Label = Label;
+                        objectSurveyAnswerDto.TextBoxDtoObj.Question = Question;
+                        objectSurveyAnswerDto.TextBoxDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 4;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+
+                    });
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrRadioBoxUpdate.length != 0) {
+                    arrRadioBoxUpdate.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let RadioGroupDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var radioGroup = $(`#${value}`).dxRadioGroup("instance");
+                        radioGroup.getDataSource().reload();
+                        var datas = radioGroup.getDataSource().items();
+                        var Label = $(`#addRadioItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForRadioGroup${valueOfCount}`).dxCheckBox("instance").option("value");
+
+                        if ((!Question.replace(/\s/g, '').length) && datas.length == 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && datas.length != 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+                        else if ((Question.replace(/\s/g, '').length) && datas.length == 0) {
+
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+
+                        objectSurveyAnswerDto.RadioGroupDtoObj = RadioGroupDto;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Datas = datas;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Label = Label;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Question = Question;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 3;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+        }
+
+                if (arrRadioBox.length != 0) {
+                    arrRadioBox.forEach((value, index) => {
+                        let objectSurveyAnswerDto = new Object();
+                        let RadioGroupDto = new Object();
+                        var valueOfCount = value.substring(5);
+                        var radioGroup = $(`#${value}`).dxRadioGroup("instance");
+                        radioGroup.getDataSource().reload();
+                        var datas = radioGroup.getDataSource().items();
+                        var Label = $(`#addRadioItemTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var Question = $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("value");
+                        var isRequired = $(`#isRequiredForRadioGroup${valueOfCount}`).dxCheckBox("instance").option("value");
+
+                        if ((!Question.replace(/\s/g, '').length) && datas.length == 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+                        else if ((!Question.replace(/\s/g, '').length) && datas.length != 0) {
+                            $(`#radioExplainTexBox${valueOfCount}`).dxTextBox("instance").option("isValid", false);
+                            errorCount++;
+                            return;
+                        }
+                        else if ((Question.replace(/\s/g, '').length) && datas.length == 0) {
+
+                            DevExpress.ui.notify({
+                                message: "Lütfen Veri Giriniz",
+                                type: "warning",
+                                displayTime: 1000,
+                                height: 50,
+                                width: 200,
+                                position: {
+                                    my: 'right top',
+                                    at: 'right top',
+                                },
+                            });
+                            errorCount++;
+                            return;
+                        }
+
+                        if (isRequired != true) {
+                            isRequired = false;
+                        }
+
+                        objectSurveyAnswerDto.RadioGroupDtoObj = RadioGroupDto;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Datas = datas;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Label = Label;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.Question = Question;
+                        objectSurveyAnswerDto.RadioGroupDtoObj.isRequired = isRequired;
+                        objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 3;
+                        arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                    });
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+                }
+
+                if (arrCreatedFieldCheckboxUpdate.length != 0) {
+                    
+                    if (arrCheckBoxUpdate.length == 0) {                        
+                        arrCreatedFieldCheckboxUpdate.forEach((value) => {
+                            console.log(value);
+                            var Question = $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("value");
+                            if ((!Question.replace(/\s/g, '').length) && datasForCheckBoxUpdate.length == 0) {
+                                $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                                DevExpress.ui.notify({
+                                    message: "Lütfen Veri Giriniz",
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                                errorCount++;
+                                return;
+                            }
+                            else if ((!Question.replace(/\s/g, '').length) && datasForCheckBoxUpdate.length != 0) {
+                                $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                                errorCount++;
+                                return;
+                            }
+                            else if ((Question.replace(/\s/g, '').length) && datasForCheckBoxUpdate.length == 0) {
+
+                                DevExpress.ui.notify({
+                                    message: "Lütfen Veri Giriniz",
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                                errorCount++;
+                                return;
+                            }
+                        });
+                    }
+                    else {                        
+                        var groupBy = function (xs, key) {
+                            return xs.reduce(function (rv, x) {
+                                (rv[x[key]] = rv[x[key]] || []).push(x);
+                                return rv;
+                            }, {});
+                        };
+                        var groupedArrayCheckBoxUpdate = groupBy(arrCheckBoxUpdate, 'field');
+                        for (var i = 0; i < $(".CHECKBOXUPDATE").length; i++) {
+                            var fieldName = $(".CHECKBOXUPDATE")[i].id;
+                            var fieldNameSubstring = fieldName.substring(5);
+                            let objectSurveyAnswerDto = new Object();
+
+                            groupedArrayCheckBoxUpdate[fieldName].forEach((value) => {
+                                datasForCheckBoxUpdate.push(value.obj2.data);
+                            });
+
+                            let CheckBoxDto = new Object();
+                            var Question = $(`#createCheckboxExplainTexBox${fieldNameSubstring}`).dxTextBox("instance").option("value");
+                            var isRequired = $(`#isRequiredForCheckBox${fieldNameSubstring}`).dxCheckBox("instance").option("value");
+
+                            if (isRequired != true) {
+                                isRequired = false;
+                            }
+
+                            objectSurveyAnswerDto.CheckBoxDtoObj = CheckBoxDto;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Datas = datasForCheckBoxUpdate;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Question = Question;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.isRequired = isRequired;
+                            objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 1;
+                            arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                            console.log(arrObjectSurveyAnswerDto);
+                        }
+                    }
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+
+                }
+
+                if (arrCreatedFieldCheckbox.length != 0) {                    
+                    if (arrCheckBox.length == 0) {
+                        arrCreatedFieldCheckbox.forEach((value) => {
+                            var Question = $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("value");
+                            if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+                                $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                                DevExpress.ui.notify({
+                                    message: "Lütfen Veri Giriniz",
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                                errorCount++;
+                                return;
+                            }
+                            else if ((!Question.replace(/\s/g, '').length) && datasForCheckBox.length != 0) {
+                                $(`#createCheckboxExplainTexBox${value}`).dxTextBox("instance").option("isValid", false);
+                                errorCount++;
+                                return;
+                            }
+                            else if ((Question.replace(/\s/g, '').length) && datasForCheckBox.length == 0) {
+
+                                DevExpress.ui.notify({
+                                    message: "Lütfen Veri Giriniz",
+                                    type: "warning",
+                                    displayTime: 1000,
+                                    height: 50,
+                                    width: 200,
+                                    position: {
+                                        my: 'right top',
+                                        at: 'right top',
+                                    },
+                                });
+                                errorCount++;
+                                return;
+                            }
+                        });
+                    }
+                    else {
+                        var groupBy = function (xs, key) {
+                            return xs.reduce(function (rv, x) {
+                                (rv[x[key]] = rv[x[key]] || []).push(x);
+                                return rv;
+                            }, {});
+                        };
+                        var groupedArrayCheckBox = groupBy(arrCheckBox, 'field');
+                        for (var i = 0; i < $(".CHECKBOX").length; i++) {
+                            var fieldName = $(".CHECKBOX")[i].id;
+                            var fieldNameSubstring = fieldName.substring(5);
+                            let objectSurveyAnswerDto = new Object();
+
+                            groupedArrayCheckBox[fieldName].forEach((value) => {
+                                datasForCheckBox.push(value.obj2.data);
+                            });
+
+                            let CheckBoxDto = new Object();
+                            var Question = $(`#createCheckboxExplainTexBox${fieldNameSubstring}`).dxTextBox("instance").option("value");
+                            var isRequired = $(`#isRequiredForCheckBox${fieldNameSubstring}`).dxCheckBox("instance").option("value");
+
+                            if (isRequired != true) {
+                                isRequired = false;
+                            }
+
+                            objectSurveyAnswerDto.CheckBoxDtoObj = CheckBoxDto;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Datas = datasForCheckBox;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.Question = Question;
+                            objectSurveyAnswerDto.CheckBoxDtoObj.isRequired = isRequired;
+                            objectSurveyAnswerDto.SurveyAnswerControlTypeInt = 1;
+                            arrObjectSurveyAnswerDto.push(objectSurveyAnswerDto);
+                        }
+                    }
+
+                    if (errorCount != 0) {
+                        errorCount = 0;
+                        return;
+                    }
+
+                }
+
+                var ajaxHeader = {};
+                ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+                var Name = $("#surveyQuestionDefinitionName").dxTextBox("instance").option("value");
+                var SurveyQuestionCode = $("#surveyQuestionDefinitionCode").dxTextBox("instance").option("value");                
+
+                var formData = new FormData();
+                formData.append("Id", data.Id);
+                //formData.append("AddedTime", data.AddedTime);
+                //formData.append("IsDeleted", data.IsDeleted);
+                //formData.append("IsActive", data.IsActive);
+                //formData.append("Name", Name);
+                //formData.append("Address", Adress);
+                //formData.append("AddedByUserId", data.AddedByUserId);
+                formData.append("QuestionName", Name);
+                formData.append("Code", SurveyQuestionCode);
+                formData.append("SurveyAnswerControlDtosJson", JSON.stringify(arrObjectSurveyAnswerDto));
+                formData.append("OrderOfTheSurveyQuestion", arrOrder);
+                //formData.append("AddedByUserId", @userViewData.Id);
+                //formData.append("LastModifiedByUserId", @userViewData.Id);
+
+                $.ajax({
+                    url: "SurveyQuestionDefinition?handler=UpdateForm",
+                    headers: ajaxHeader,
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    type: 'post',
+                    success: function (response) {
+                    //$("#gridTicket").dxDataGrid("instance").option("dataSource", response.data);
+                        arrComboBox = [];
+                        arrComboBoxUpdate = [];
+                        arrTextBox = [];
+                        arrTextBoxUpdate = [];
+                        arrRadioBox = [];
+                        arrRadioBoxUpdate = [];
+                        arrCheckBox = [];
+                        arrRadioItemValues = [];
+                        arrRadioItemValuesUpdate = [];
+                        checkBoxItemValues = [];
+                        //arrObjectSurveyAnswerDto = [];
+                        valueOfCountCheckBox = 0;
+                        datasForCheckBox = [];
+                        datasForCheckBoxUpdate = [];
+                        arrOrder = [];
+                        errorCount = 0;
+                        sayac = 0;
+                        sayacUpdate = 0;
+                        arrFieldCheckBox = [];
+                        arrFieldCheckBoxUpdate = [];
+                        inputValue;
+                        arrCreatedFieldCheckbox = [];
+                        arrCreatedFieldCheckboxUpdate = [];
+                        buttonCount = 0;
+                        count = 1;
+                        updateCount = 0;
+                        checkBoxItemValuesUpdate = [];
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.log("error");
+                        arrComboBox = [];
+                        arrComboBoxUpdate = [];
+                        arrTextBox = [];
+                        arrTextBoxUpdate = [];
+                        arrRadioBox = [];
+                        arrRadioBoxUpdate = [];
+                        arrCheckBox = [];
+                        arrRadioItemValues = [];
+                        arrRadioItemValuesUpdate = [];
+                        checkBoxItemValues = [];
+                        //arrObjectSurveyAnswerDto = [];
+                        valueOfCountCheckBox = 0;
+                        datasForCheckBox = [];
+                        datasForCheckBoxUpdate = [];
+                        arrOrder = [];
+                        errorCount = 0;
+                        sayac = 0;
+                        sayacUpdate = 0;
+                        arrFieldCheckBox = [];
+                        arrFieldCheckBoxUpdate = [];
+                        inputValue;
+                        arrCreatedFieldCheckbox = [];
+                        arrCreatedFieldCheckboxUpdate = [];
+                        buttonCount = 0;
+                        count = 1;
+                        updateCount = 0;
+                        checkBoxItemValuesUpdate = [];
+                    }
+                });
+    }
+</script>
+
+
+<style>
+    .dpbColor {
+        background-color: #337ab7;
+        border-radius: 4px;
+    }
+
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+
+    .dx-datagrid-text-content {
+        color: black;
+        font-weight: 700;
+    }
+
+    .dx-datagrid-export-button {
+        background-color: #337ab7;
+    }
+
+    /*bu ve altındaki css özelliği yazıların ve ikonların beyaz olmasını sağlamaktadır.*/
+    .dx-button-mode-outlined {
+        background-color: transparent;
+        border-color: #ddd;
+        color: white;
+    }
+
+        .dx-button-mode-outlined .dx-icon {
+            color: white;
+        }
+
+    .dx-icon-export-to {
+        color: white !important;
+    }
+
+    .dx-icon-export-excel-button {
+        color: white !important;
+    }
+
+
+    .dx-datagrid-export-button.dx-state-hover {
+        background-color: #285f8f !important;
+    }
+
+    .dx-datagrid-export-button.dx-state-active {
+        background-color: #285f8f !important;
+    }
+
+
+    .dx-datagrid-column-chooser-button {
+        background-color: #337ab7;
+    }
+
+    .dx-icon-column-chooser {
+        color: white !important;
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-hover {
+        background-color: #285f8f !important;
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-active {
+        background-color: #285f8f !important;
+    }
+
+    .form {
+        display: flex;
+    }
+
+
+        .form > div {
+            display: inline-block;
+            vertical-align: top;
+        }
+
+
+    #treeviewDriveC,
+    #treeviewDriveD {
+        margin-top: 10px;
+    }
+
+
+    .drive-header {
+        min-height: auto;
+        padding: 0px;
+        cursor: default;
+    }
+
+
+    .drive-panel {
+        padding: 20px 30px;
+        font-size: 115%;
+        font-weight: bold;
+        border-right: 1px solid rgba(165, 165, 165, 0.4);
+        height: 100%;
+    }
+
+
+        .drive-panel:last-of-type {
+            border-right: none;
+        }
+
+    .dx-state-disabled .dx-placeholder {
+        color: black;
+        font-weight: bold;
+    }
+
+    .field {
+        border: 1px solid;
+        border-color: #dbd8d8;
+        padding: 10px;
+        margin-top: 10px;
+    }
+
+    #surveyQuestionDefinitionCode {
+        margin-top: 10px;
+    }
+
+    dx-item-content .dx-list-item-content {
+        float: left;
+    }
+</style>

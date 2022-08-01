@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DevExtreme.AspNet.Core" Version="21.1.5" />
+    <PackageReference Include="DevExtreme.AspNet.Data" Version="2.8.6" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="5.0.15" />
+    <PackageReference Include="Microsoft.AspNetCore.Cryptography.KeyDerivation" Version="5.0.15" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="5.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="RestSharp" Version="107.3.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.17.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Data\EF_Data\DiasFacilityManagement\SqlServer\DataTransferObjects\Live\" />
+    <Folder Include="Data\EF_Data\DiasFacilityManagement\SqlServer\DataTransferObjects\Test\Shared\Standard\Identity\" />
+    <Folder Include="Data\JsonData\InputOutput\Filters\Mobile\" />
+    <Folder Include="Data\JsonData\InputOutput\Filters\WebMobile\" />
+    <Folder Include="Data\JsonData\InputOutput\Filters\Web\DevExpress\Live\" />
+    <Folder Include="Data\JsonData\InputOutput\Filters\Web\DevExpress\Test\" />
+    <Folder Include="Data\JsonData\Input\M_Files\CustomDeserializeObjects\Development\" />
+    <Folder Include="Data\JsonData\Input\M_Files\CustomDeserializeObjects\Live\" />
+    <Folder Include="Data\JsonData\Input\M_Files\CustomDeserializeObjects\Test\" />
+    <Folder Include="Data\JsonData\Input\M_Files\StandartDeserializeObjects\Development\" />
+    <Folder Include="Data\JsonData\Input\M_Files\StandartDeserializeObjects\Live\" />
+    <Folder Include="Data\JsonData\Input\M_Files\StandartDeserializeObjects\Test\" />
+    <Folder Include="Data\JsonData\Output\" />
+    <Folder Include="InterfacesAbstracts\Data\EF_Data\DiasFacilityManagement\SqlServer\DataTransferObjects\Live\" />
+    <Folder Include="Operations\CommunicationOperations\DiasFacilityManagement\Live\" />
+  </ItemGroup>
+
+</Project>

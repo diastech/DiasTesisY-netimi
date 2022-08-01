@@ -1,0 +1,27 @@
+vaka numarası
+müdahale süresi(24dk)
+çözüm süresi(2dk)
+bildirim zamanı(opened time)
+hedeflenen müdahale zamanı
+hedeflenen çözüm zamanı
+bildiren kişi (freetext) 
+telefon 
+kayıt altına alan kişi
+atama grubu
+müdahale edilme zamanı
+çözüm zamanı
+kapatılma tarihi
+
+
+
+Grid filtre çalışmıyor
+
+filterDeclarativeUser
+txtPhoneFilter
+filterDeclarativeUser
+
+sbAssignedGroupFilter
+
+filterResponsedTime
+filterResoluitonedTime
+filterClosedTime

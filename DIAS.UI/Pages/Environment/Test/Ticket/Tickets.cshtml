@@ -1,0 +1,1096 @@
+﻿@page
+
+@using static DiasShared.Enums.Standart.TicketEnums
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Custom
+@model DIAS.UI.Pages.Ticket.CustomTicketDto
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+
+<script src="https://unpkg.com/devextreme-aspnet-data/js/dx.aspnet.data.js"></script>
+<script src="~/js/pages/ticket/tickets.js"></script>
+<script src="~/js/pages/shared/reason.js"></script>
+<script src="~/js/pages/shared/location.js"></script>
+
+<div id="accordion">
+    <div class="card">
+        <div class="card-header" id="headingOne">
+            <h5 class="mb-0">
+                <button class="btn btn-link" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                    <i style="margin-right:5px" class="fa fa-filter" aria-hidden="true"></i>Filtre
+                </button>
+            </h5>
+        </div>
+
+        <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">
+            <div class="card-body">
+                @(Html.DevExtreme().Form().ID("#frmTicket").ColCount(3).ShowColonAfterLabel(false).Items(items =>
+            {
+            items.AddSimple().ColSpan(2).Label(l => l.Text("Arama Nedeni"))
+                .Template(@<text> @await Html.PartialAsync("../Shared/_ReasonTemplate")</text>);
+
+                items.AddSimple().ColSpan(2).Label(l => l.Text("Ticket Durumu"))
+                .Template(new TemplateName("selectBoxFilterTicketStateTemplate"));
+
+                items.AddSimple().ColSpan(2).Label(l => l.Text("Mahal"))
+                .Template(new TemplateName("dropDownFilterLocationTemplate"));
+
+                items.AddSimple().ColSpan(2).Label(l => l.Text("Öncelik"))
+                .Template(new TemplateName("selectBoxFilterPriorityTemplate"));
+
+                items.AddSimple().ColSpan(2).Label(l => l.Text("Sorumlu Kişi"))
+                .Template(new TemplateName("selectBoxFilterTicketUserTemplate"));
+
+                items.AddSimple().Label(l => l.Text("Açıklama")).Editor(e => e.TextBox().ID("textDescription").ShowClearButton(true));
+                items.AddEmpty().ColSpan(2);
+                items.AddButton()
+                    .ButtonOptions(a => a.Text("Ara")
+                    .Height(40)
+                    .Width(180)
+                    .ID("ticketSearch")
+                    .Icon("fas fa-search")
+                    .Type(ButtonType.Default)
+                    .OnClick("Tickets.btn_ticketFindClick")
+                    .UseSubmitBehavior(true)
+                    .Template(@<text>
+                                <div id="widget"></div>
+	                            <i class="dx-icon fas fa-search"></i>
+                                <span class="dx-button-text"><%- text %></span>
+                            </text>)
+                            .Hint("Kayıtları Filtrele"))
+                        .HorizontalAlignment(HorizontalAlignment.Right);
+                }))
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header" id="headingTwo">
+            <h5 class="mb-0">
+                <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                    <i style="margin-right:5px" class="fas fa-ticket-alt"></i>Liste
+                </button>
+            </h5>
+        </div>
+        <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+            <div class="card-body">
+                <div class="btn-group">
+                    @(Html.DevExtreme().Button().ID("btn_refresh")
+                        .Hint("Yenile")
+                        .Template(
+                            @<text>
+	                <i class="dx-icon fas fa-redo">
+                    </i>
+                    <span class="dx-button-text" id="timer"></span>
+                            </text>)
+                        .Type(ButtonType.Normal)
+                        .OnClick("Tickets.btn_refreshGridClick")
+                    )
+                </div>
+                @(Html.DevExtreme().DataGrid<CustomTicketDto>()
+                            .ID("gridTicket")
+                            .DataSource(ds => ds.RemoteController()
+                            .OnBeforeSend("beforeSend")
+                            .Key("Id")
+                            .LoadUrl(Url.Page(null, "GridData"))
+                            .InsertUrl(Url.Page(null, "GridRow"))
+                            .UpdateUrl(Url.Page(null, "GridRowUpdate"))
+                            .DeleteUrl(Url.Page(null, "GridRowDelete"))
+                        )
+                            .HeaderFilter(o=>o.AllowSearch(true))
+                            .FilterRow(o => o.Visible(true))
+                            .Selection(s => s.Mode(SelectionMode.Single))
+                            .OnSelectionChanged("onSelectionChanged")
+                            .OnToolbarPreparing("onToolbarPreparing")
+                        .RemoteOperations(true)
+                            .ShowBorders(true)
+                            .Paging(p => p.Enabled(false))
+                        .Editing(e => e.Mode(GridEditMode.Popup)
+                                .AllowUpdating(true)
+                                .AllowDeleting(true)
+                                .AllowAdding(true)
+                                .EditColumnName("Düzenle")
+                                .SelectTextOnEditStart(true)
+                                .StartEditAction(GridStartEditAction.DblClick)
+                                .Popup(p => p
+                                    .Title("Ticket Ekle")
+                                    .ID("popupContainer")
+                                    .ShowTitle(true)
+                                    .Width(700)
+                                    .Height(525)
+                                    .OnShowing("setPopupTitle")
+                                    .ShowCloseButton(true)
+                                )
+                            .Form(f => f.Items(items =>
+                            {
+                            items.AddGroup()
+                                .Items(groupItems =>
+                                {
+                                    groupItems.AddTabbed()
+                .TabPanelOptions(o =>
+                {
+                    o.DeferRendering(false);
+                    o.AnimationEnabled(true);
+                    o.ID("ticketTab");
+                    o.Width(650);
+                    o.AnimationEnabled(true);
+                    o.ShowNavButtons(true);
+                    o.Height("100%");
+                    o.OnItemRendered("Tickets.tabTicketItemRendered");
+                })
+                .Tabs(tabItems =>
+                {
+                tabItems.Add().Icon("fas fa-save")
+                .Title("Ticket Bilgileri")
+                .Items(tabItem =>
+                {
+                    tabItem.AddSimpleFor(m => m.TicketReasonId)
+        .Label(l => l.Text("Arama Sebebi").Visible(false))
+        .Editor(e => e.DropDownBox()
+        .ID("dropDownReasonSinglePeriodicTicket")
+        .DataSource(d => d.RemoteController()
+        .Key("HierarchyId")
+        .LoadUrl(Url.Page(null, "TicketReasonData")))
+        .DeferRendering(false)
+        .ValueExpr("HierarchyId")
+        .DisplayExpr("CategoryName")
+        .DropDownOptions(o => o.Height(350))
+        .Placeholder("Arama sebebi seçiniz..")
+        .ShowClearButton(true)
+        .OnValueChanged("treeBox_valueChangedReason")
+        .ContentTemplate(
+        new TemplateName("reasonTreeViewSingle2")
+        ))
+                .ValidationRules(v =>
+                {
+                    v.AddRequired().Message("Arama Sebebi Boş Geçilemez");
+                });
+                    tabItem.AddSimpleFor(m => m.TicketRelatedLocations).Label(l => l.Text("Mahal").Visible(false))
+    .Editor(e => e.DropDownBox()
+    .ID("dropDownLocationPeriodicTicket")
+    .DataSource(d => d.RemoteController()
+    .Key("HierarchyId")
+    .LoadUrl(Url.Page(null, "LocationData"))
+    .LoadMode(DataSourceLoadMode.Raw))
+    .DeferRendering(false)
+    .ValueExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .DropDownOptions(o => o.Height(350))
+    .Placeholder("Lütfen Seçiniz..")
+    .ShowClearButton(true)
+    .OnValueChanged("Location.treeBox_valueChanged")
+    .ContentTemplate(
+    new TemplateName("locationTreeViewMultiple2")
+    ))
+                    .ValidationRules(v =>
+                    {
+                        v.AddRequired().Message("Mahal Bilgisi Boş Geçilemez");
+                    });
+                    tabItem.AddSimpleFor(m => m.TicketPriorityId).Label(l => l.Text("Öncelik").Visible(false))
+                .Editor(e => e.SelectBox().ID("sbTicketPriority")
+                .DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+                .DisplayExpr("Text")
+                .ShowClearButton(true)
+                .DeferRendering(false)
+                .SearchEnabled(true)
+                .Placeholder("Öncelik seçiniz.")
+                .ValueExpr("Value"))
+                        .ValidationRules(v =>
+                        {
+                            v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                        });
+
+                    tabItem.AddSimpleFor(m => m.TickedAssignedAssignmentGroupId)
+            .Label(l => l.Text("Sorumlu Grup").Visible(false))
+            .Editor(e => e.SelectBox()
+            .ID("sbAsgGroup")
+            .DataSource(d => d.RemoteController().CacheRawData(false)
+            .Key("id")
+            .LoadUrl(Url.Page(null, "TicketAssignmentGroupData"))
+            .LoadMode(DataSourceLoadMode.Raw))
+            .DeferRendering(false)
+            .ValueExpr("Id")
+            .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+            .ShowClearButton(true)
+            .SearchEnabled(true)
+            .Placeholder("Sorumlu grup seçiniz.")
+            .SearchExpr("FirstName", "LastName", "UserName", "Email"));
+
+                    tabItem.AddSimpleFor(m => m.TicketAssignedUserId)
+        .Label(l => l.Text("Sorumlu Kişi").Visible(false))
+        .Editor(e => e.SelectBox()
+        .ID("sbAsgGroupEmp")
+        .DataSource(d => d.RemoteController()
+        .Key("Id")
+        .LoadUrl(Url.Page(null, "UserData")))
+        .DataSourceOptions(o => o.Paginate(true).PageSize(20))
+        .DeferRendering(false)
+        .ValueExpr("Id")
+        .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+        .ShowClearButton(true)
+        .SearchEnabled(true)
+        .Placeholder("Sorumlu kişi seçiniz.")
+        .SearchExpr("FirstName", "LastName", "UserName", "Email"))
+                    .ValidationRules(v =>
+                    {
+                        v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                    });
+
+                    tabItem.AddSimpleFor(m => m.TicketOpenedTime)
+        .Label(l => l.Text("Tarih").Visible(false)).Editor(e => e.DateBox().ID("dateTicket")
+        .ShowClearButton(true)
+        .Type(DateBoxType.DateTime)
+        .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+        .Placeholder("Tarih seçiniz."))
+                        .ValidationRules(v =>
+                        {
+                            v.AddRequired().Message("Tarih boş geçilemez.");
+                        });
+
+                    tabItem.AddSimpleFor(m => m.TicketDescription)
+    .Label(l => l.Text("Açıklama").Visible(false)).Editor(e => e.TextArea().ID("textAreaDescription")
+    .Placeholder("Açıklama giriniz...").Height(150))
+                    .ValidationRules(v =>
+                    {
+                        v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                    });
+                });
+
+                tabItems.Add()
+                .Title("Notlar")
+                .Template(new TemplateName("tabTicketNotesTemplate"));
+
+                tabItems.Add()
+                .Title("Dosyalar")
+                .Template(new TemplateName("tabTicketAttachmentsGridTemplate"));
+
+                tabItems.Add()
+    .Title("Sorular")
+    .Template(@<text>
+                </text>);
+                                tabItems.Add()
+                .Title("Tarihçe")
+                .Template(@<text>
+                </text>);
+                    });
+
+                                    });
+
+
+                                }).ID("ticketForm")))
+        .Columns(columns =>
+        {
+            columns.Add()
+               .Caption("")
+               .AllowSearch(false)
+               .AllowSorting(false)
+               .Alignment(HorizontalAlignment.Center)
+               .CellTemplate(new JS("Tickets.cellTemplate_CurrentStatus"))
+               .Width(41);
+            columns.AddFor(m => m.TicketReason.ReasonName).Caption("Arama Sebebi").AllowEditing(true);
+            columns.AddFor(m => m.TicketStatusId).Caption("İş Emri Durumu")
+            .Lookup(lookup => lookup
+            .DataSource(Html.GetEnumSelectList<TicketStatusEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+            .ValueExpr("Value")
+            .DisplayExpr("Text")
+        );
+            columns.AddFor(m => m.FirstLastName).Caption("Ekleyen Kullanıcı").AllowEditing(true);
+            columns.AddFor(y => y.TicketPriorityId).Caption("Öncelik").AllowEditing(true)
+            .Lookup(l => l.DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+                .ValueExpr("Value")
+                .DisplayExpr("Text"));
+            columns.AddFor(y => y.TickedAssignedAssignmentGroup.GroupName).Caption("Sorumlu Grup").AllowEditing(true);
+            columns.AddFor(m => m.TicketStatus.Name).Caption("Ticket Durumu");
+            columns.Add()
+                  .Caption("Kalan Süre")
+                  .AllowSearch(false)
+                  .AllowFiltering(false)
+                  .AllowGrouping(false)
+                  .AllowHeaderFiltering(false)
+                  .AllowHiding(false)
+                  .AllowReordering(false)
+                  .AllowResizing(false)
+                  .Alignment(HorizontalAlignment.Left)
+                  .CellTemplate(new JS("Tickets.cellTemplate_TimeRemaining"))
+                  .Width(140);
+
+            columns.Add().Width(150).CellTemplate(@<text>
+                @(Html.DevExtreme().DropDownButton()
+                    .OnSelectionChanged("onSelectionChangedDpButton")
+                        .ElementAttr(new JS("{ style: 'background-color: white;' }"))
+                        .Text("Seçenekler")
+                        .DeferRendering(true)
+                        .Icon("fas fa-ellipsis-v")
+                        .DataSource(d => d.RemoteController()
+                        .Key("Id")
+                        .LoadUrl(Url.Page(null, "TicketStateData")))
+                        .DropDownOptions(options => options.Width(250))
+                        .DisplayExpr("StateDescription")
+                        .KeyExpr("Id")
+                        .OnItemClick("btn_ticketStateOnClick")
+                        .ItemTemplate(new JS("Tickets.btnStateTemplate"))
+                                    )
+                </text>);
+        })
+        //.OnSelectionChanged("Tickets.grd_selectionChanged")
+        .OnRowPrepared("Tickets.grd_onRowPrepared")//önceliğine göre grid renklerini ayarlama
+        .OnEditingStart(@<text> function(e) {onEditingStart(e) } </text>)
+        .OnInitNewRow(@<text> function(e) { OnInitNewRow(e); } </text>)
+
+
+        .MasterDetail(md => md
+        .Enabled(true)
+        .Template(@<text>
+            @(Html.DevExtreme().DataGrid<CustomTicketDto>()
+            .ColumnAutoWidth(true)
+            .ShowBorders(true)
+            .RemoteOperations(true)
+            .Columns(column =>
+            {
+                column.Add().DataField("TicketRelatedLocations").CellTemplate(new JS("TicketRelatedLocationsFunc")).Caption("Lokasyon");
+                column.AddFor(m => m.TicketReason.ReasonName).Caption("Arama Sebebi");
+                column.AddFor(m => m.TickedAssignedAssignmentGroup.GroupName).Caption("Sorumlu Gurup");
+                
+            })
+            .DataSource(d => d.RemoteController()
+            .Key("Id")
+            .LoadUrl(Url.Page(null, "TicketDataById"))
+            .LoadParams(new { ticketId = new JS("data.Id") })
+            )
+
+            )
+
+        </text>)
+    )
+    )
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+
+@using (Html.DevExtreme().NamedTemplate("selectBoxFilterTicketStateTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbTicketState")
+    .DataSource(d => d.RemoteController()
+    .Key("Id")
+    .LoadUrl(Url.Page(null, "TicketStateData"))
+    )
+    .DeferRendering(false)
+    .ValueExpr("Id")
+    .DisplayExpr("StateDescription")
+    .ShowClearButton(true)
+    .DeferRendering(false)
+)
+
+}
+
+@using (Html.DevExtreme().NamedTemplate("dropDownFilterLocationTemplate"))
+{
+    @(Html.DevExtreme()
+    .DropDownBox()
+    .ID("dropDownLocation")
+    .DataSource(d => d.RemoteController()
+    .Key("HierarchyId")
+    .LoadUrl(Url.Page(null, "LocationData"))
+    )
+    .DeferRendering(false)
+    .ValueExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .DropDownOptions(o => o.Height(350))
+    .Placeholder("Lütfen Seçiniz..")
+    .ShowClearButton(true)
+    .OnValueChanged("Location.treeBox_valueChanged")
+    .ContentTemplate(
+        @<text>
+            @await Html.PartialAsync("_LocationTreeViewMultiple")
+        </text>
+    )
+)
+
+}
+
+@using (Html.DevExtreme().NamedTemplate("selectBoxFilterPriorityTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbPriority")
+    .DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+    .ValueExpr("ID")
+    .DisplayExpr("Text")
+    .ShowClearButton(true)
+)
+}
+
+@using (Html.DevExtreme().NamedTemplate("selectBoxFilterTicketUserTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbTicketUser")
+    .DataSource(d => d.RemoteController()
+    .Key("Id")
+    .LoadUrl(Url.Page(null, "UserData"))
+    ).DataSourceOptions(o => o.Paginate(true).PageSize(20))
+    .DeferRendering(true)
+    .ValueExpr("Id")
+    .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+    .ShowClearButton(true)
+    .SearchEnabled(true)
+    .SearchExpr("FirstName", "LastName", "UserName", "Email")
+)
+}
+
+@using (Html.DevExtreme().NamedTemplate("reasonTreeViewSingle2"))
+{
+    @(Html.DevExtreme().TreeView()
+    .ID("reasonTreeViewSingle2")
+    .DataSource(new JS(@"component.getDataSource()"))
+    .KeyExpr("HierarchyId")
+    .DisplayExpr("CategoryName")
+    .ParentIdExpr("ParentHierarchy")
+    .ExpandNodesRecursive(true)
+    .DataStructure(TreeViewDataStructure.Plain)
+    .SelectionMode(NavSelectionMode.Single)
+    .SelectNodesRecursive(false)
+    .SelectByClick(true)
+    .SearchEnabled(true)
+    .Height(300)
+    .OnItemClick(
+        @<text>
+            function(args) {
+                component.close();
+            }
+        </text>
+    )
+    .OnItemSelectionChanged(
+        @<text>
+            function(args) {
+                component.option("value", args.component.getSelectedNodeKeys());
+            }
+        </text>
+    )
+    .OnContentReady(
+        @<text>
+            function(args) {
+                syncTreeViewSelection(args.component, component.option("value"));
+            }
+        </text>
+    )
+)
+}
+@using (Html.DevExtreme().NamedTemplate("locationTreeViewMultiple2"))
+{
+    @(Html.DevExtreme().TreeView()
+    .ID("locationTreeViewMultiple2")
+    .DataSource(new JS(@"component.getDataSource()"))
+    .KeyExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .ParentIdExpr("ParentHierarchy")
+    .DataStructure(TreeViewDataStructure.Plain)
+    .SelectionMode(NavSelectionMode.Multiple)
+    .ShowCheckBoxesMode(TreeViewCheckBoxMode.Normal)
+    .SelectNodesRecursive(false)
+    .SelectByClick(true)
+    .Height(300)
+    .SearchEnabled(true)
+    .SearchEditorOptions(o => o.Placeholder("Mahal Ara"))
+    .SearchTimeout(500)
+    .OnItemClick(
+        @<text>
+            function(args) {
+                component.close();
+            }
+        </text>
+    )
+    .OnItemSelectionChanged(
+        @<text>
+            function(args) {
+                component.option("value", args.component.getSelectedNodeKeys());
+            }
+        </text>)
+    .OnContentReady(
+        @<text>
+            function(args) {
+                Location.syncTreeViewSelection(args.component, component.option("value"));
+            }
+        </text>)
+)
+}
+
+@using (Html.DevExtreme().NamedTemplate("tabTicketNotesTemplate"))
+{
+    <div>
+        @(Html.DevExtreme().TextArea().ID("textTicketNote").Placeholder("Notunuzu giriniz...").Height(75))
+    </div>
+    <div id="fileuploader-container">
+        @(Html.DevExtreme().FileUploader()
+            .ID("file-uploader")
+            .Name("myFile")
+            .Multiple(true)
+            .Accept("*")
+            .UploadMode(FileUploadMode.UseForm)
+            .ShowFileList(true)
+            .OnValueChanged("noteFileUploader_valueChanged")
+     )
+    </div>
+    <div class="content" id="selected-files">
+        <div>
+            <h4>Seçilen Dosyalar</h4>
+        </div>
+    </div>
+    <div>
+        @(Html.DevExtreme().DataGrid().ID("ticketNotesGrid")
+            .LoadPanel(panel => panel.Enabled(true))
+
+            .ShowColumnLines(false)
+            .ShowRowLines(true)
+            .WordWrapEnabled(true)
+            .Paging(paging => paging.Enabled(true).PageSize(6))
+            .Columns(columns => {
+                columns.Add()
+                    .Caption("Not ID").DataField("Id")
+                    .Visible(false)
+                    .Alignment(HorizontalAlignment.Left);
+                columns.Add()
+                    .Caption("Ticket ID").DataField("TicketId")
+                    .Visible(false)
+                    .Alignment(HorizontalAlignment.Left);
+                columns.Add().Caption("Text").DataField("NoteText").Alignment(HorizontalAlignment.Left);
+                columns.Add()
+                    .Caption("Ekler").DataField("Attachments").Alignment(HorizontalAlignment.Left).CellTemplate(new JS("TicketNoteGridCellTemplate"));
+            })
+        )
+    </div>
+}
+
+
+@using (Html.DevExtreme().NamedTemplate("tabTicketAttachmentsGridTemplate"))
+{
+    <div id="fileuploader-container">
+        @(Html.DevExtreme().FileUploader()
+            .ID("attachment-uploader")
+            .Name("myFile")
+            .Multiple(false)
+            .Accept("*")
+            .UploadMode(FileUploadMode.UseForm)
+            .ShowFileList(true)
+            .OnValueChanged("attachmentUploader_valueChanged")
+     )
+    </div>
+    <div>
+        @(Html.DevExtreme().DataGrid().ID("ticketAttachmentGrid")
+            .LoadPanel(panel => panel.Enabled(true))
+            .ShowColumnLines(false)
+            .ShowRowLines(true)
+            //.Height(310)
+            .WordWrapEnabled(true)
+            .Paging(paging => paging.Enabled(true).PageSize(6))
+            .Columns(columns => {
+                columns.Add()
+                    .Caption("Not ID").DataField("Id")
+                    .Visible(false)
+                    .Alignment(HorizontalAlignment.Left);
+                columns.Add()
+                    .Caption("Ticket ID").DataField("TicketId")
+                    .Visible(false)
+                    .Alignment(HorizontalAlignment.Left);
+                columns.Add()
+                    .Caption("Açıklama").DataField("AttachmentDescription").Alignment(HorizontalAlignment.Left);
+                columns.Add()
+                    .Caption("Dosya Eki").DataField("folderName").Alignment(HorizontalAlignment.Left)
+                    .CellTemplate(new JS("ticketAttachmentGridCellTemplate"));
+            })
+        )
+    </div>
+}
+<!-- #endregion -->
+
+
+
+
+<script type="text/javascript">
+    var data;
+    let attachmentFile;
+    let noteFile;
+
+    //row u editlemek istediğimizde
+    function onEditingStart(e) {
+        data = e.data;
+    }
+    //yeni bir row eklemek istediğimizde
+    function OnInitNewRow(e) {
+
+        data = null;
+    }
+
+    function onToolbarPreparing(e) {
+        e.toolbarOptions.items[0].showText = "always";
+        e.toolbarOptions.items[0].options.text = "Yeni iş Emri ";
+        e.toolbarOptions.items[0].options.icon = "plus";
+        e.toolbarOptions.items[0].options.elementAttr = { class: "btn-class-dias" }
+
+    }
+
+
+
+    //title açıldığında
+    function setPopupTitle(e) {
+
+        if (data != null) {
+            $("#popupContainer").dxPopup({
+                title: "Ticket Düzenle",
+            });
+
+            var ticketReasonHierarchy = data.TicketReason.TicketReasonCategory.HierarchyId + `${data.TicketReasonId}/`;
+            $("#ticketAttachmentGrid").dxDataGrid("instance").option("dataSource", data.Attachments);
+
+            $("#ticketNotesGrid").dxDataGrid("instance").option("dataSource", data.TicketNotes);
+
+            $("#dropDownReasonSinglePeriodicTicket").dxDropDownBox("instance").option("value", ticketReasonHierarchy);
+            $("#sbTicketPriority").dxSelectBox("instance").option("value", null);
+
+            $("#sbTicketPriority").dxSelectBox("instance").option("value", data.TicketPriority);
+            $("#sbTicketPriority").dxSelectBox("instance").option("name", "TicketPriority");
+
+            let locations = [];
+
+            data.TicketRelatedLocations.forEach((location, index, array) => {
+                locations.push(location.TicketLocation.HierarchyId);
+            });
+
+            $("#dropDownLocationPeriodicTicket").dxDropDownBox("instance").option("value", locations);
+
+            $("#ticketUserId").dxSelectBox("instance").option("value", String(data.AddedByUserId));
+
+            $("#sbAsgGroup").dxSelectBox("instance").option("value", data.TickedAssignedAssignmentGroupId);
+
+            $("#sbAsgGroupEmp").dxSelectBox("instance").option("value", String(data.TicketAssignedUserId));
+
+            $("#dateTicket").dxDateBox("instance").option("value", data.TicketOpenedTime);
+
+            $("#textAreaDescription").dxTextArea("instance").option("value", data.TicketDescription);
+        }
+    }
+
+    function beforeSend(type, e) {
+
+        if (type == "load") return;
+
+        if (type == "update") {            
+            var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";            
+            
+        var openedTime = $("#dateTicket").dxDateBox("instance").option("value");
+        var openedTimeConverted = (new Date(openedTime)).toUTCString(3);
+        var TicketDescription = $("#textAreaDescription").dxTextArea("instance").option("value");
+
+        var TicketAssignedUserId = $("#sbAsgGroupEmp").dxSelectBox("instance").option("value");
+
+        var TickedAssignedAssignmentGroupId = $("#sbAsgGroup").dxSelectBox("instance").option("value");
+
+        var TicketOwnerUserId = $("#ticketUserId").dxSelectBox("instance").option("value");
+
+        var TicketPriority = $("#sbTicketPriority").dxSelectBox("instance").option("value");
+
+        var TicketReasonId = $("#dropDownReasonSinglePeriodicTicket").dxDropDownBox("instance").option("value");
+
+        var TicketRelatedLocations = $("#dropDownLocationPeriodicTicket").dxDropDownBox("instance").option("value");
+
+        var ticketNoteText = $("#textTicketNote").dxTextArea("instance").option("value");
+        
+        var formData = new FormData();
+            formData.append("Id", data.Id);
+            formData.append("AddedTime", data.AddedTime);
+            formData.append("TicketStatusId", data.TicketStatusId);
+            formData.append("IsDeleted", data.IsDeleted);
+            formData.append("IsActive", data.IsActive);
+        formData.append("TicketDescription", TicketDescription);
+        formData.append("TicketOpenedTime", openedTimeConverted);
+        formData.append("TicketAssignedUserId", TicketAssignedUserId);
+        formData.append("TickedAssignedAssignmentGroupId",7);
+        //formData.append("TicketReportedUserId", TicketOwnerUserId);
+
+        //todo : Bu değer diasproject_identity den alınacak
+        formData.append("TicketReportedUserId", 1);
+        formData.append("TicketPriority", TicketPriority);
+        formData.append("TicketReasonHierarchyId", TicketReasonId);
+
+            if (attachmentFile != null) {
+                formData.append("AttachmentsFile", attachmentFile[0]);
+            }
+            if (noteFile != null) {
+                formData.append("NotesFile", noteFile[0]);
+            }
+        
+        
+        
+        formData.append("TicketRelatedLocationHierarchyId", TicketRelatedLocations);
+        formData.append("NoteText", ticketNoteText);
+        formData.append("TicketOwnerUserId", 1);
+        formData.append("AddedByUserId", 1);
+        e.data = formData;
+        e.contentType = false;
+        e.processData = false;
+        e.headers = ajaxHeader;
+        }
+
+        if (type == "insert") {
+            var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+        var openedTime = $("#dateTicket").dxDateBox("instance").option("value");
+        var openedTimeConverted = (new Date(openedTime)).toUTCString(3);
+        var TicketDescription = $("#textAreaDescription").dxTextArea("instance").option("value");
+
+        var TicketAssignedUserId = $("#sbAsgGroupEmp").dxSelectBox("instance").option("value");
+
+        var TickedAssignedAssignmentGroupId = $("#sbAsgGroup").dxSelectBox("instance").option("value");
+
+        var TicketOwnerUserId = $("#ticketUserId").dxSelectBox("instance").option("value");
+
+        var TicketPriority = $("#sbTicketPriority").dxSelectBox("instance").option("value");
+
+        var TicketReasonId = $("#dropDownReasonSinglePeriodicTicket").dxDropDownBox("instance").option("value");
+
+        var TicketRelatedLocations = $("#dropDownLocationPeriodicTicket").dxDropDownBox("instance").option("value");
+
+        var ticketNoteText = $("#textTicketNote").dxTextArea("instance").option("value");
+
+        var formData = new FormData();
+        formData.append("TicketDescription", TicketDescription);
+        formData.append("TicketOpenedTime", openedTimeConverted);
+        formData.append("TicketAssignedUserId", TicketAssignedUserId);
+        formData.append("TickedAssignedAssignmentGroupId",7);
+        //formData.append("TicketReportedUserId", TicketOwnerUserId);
+
+        //todo : Bu değer diasproject_identity den alınacak
+        formData.append("TicketReportedUserId", 1);
+        formData.append("TicketPriority", TicketPriority);
+        formData.append("TicketReasonHierarchyId", TicketReasonId);
+        formData.append("AttachmentsFile", attachmentFile[0]);
+        formData.append("NotesFile", noteFile[0]);
+        formData.append("TicketRelatedLocationHierarchyId", TicketRelatedLocations);
+        formData.append("NoteText", ticketNoteText);
+        formData.append("TicketOwnerUserId", 1);
+        formData.append("AddedByUserId", 1);
+
+        e.data = formData;
+        e.contentType = false;
+        e.processData = false;
+        e.headers = ajaxHeader;
+        }
+
+
+
+    }
+
+    function attachmentUploader_valueChanged(e) {
+        let files = e.value;
+        attachmentFile = e.value;
+        formDataFiles = new FormData();
+        for (let i = 0; i != files.length; i++) {
+            formDataFiles.append("attachmentFile", files[i]);
+        }
+    }
+
+    function noteFileUploader_valueChanged(e) {
+        let files = e.value;
+        noteFile = e.value;
+        formDataFiles = new FormData();
+        for (let i = 0; i != files.length; i++) {
+            formDataFiles.append("noteFile", files[i]);
+        }
+    }
+
+    function syncTreeViewSelection(treeView, value) {
+        if (!value) {
+            treeView.unselectAll();
+        } else {
+            treeView.selectItem(value);
+        }
+    }
+
+    function treeBox_valueChangedReason(e) {
+        if (e.component.content() == null)
+            return;
+        var $treeView = e.component.content().find(".dx-treeview");
+        if ($treeView.length) {
+            syncTreeViewSelection($treeView.dxTreeView("instance"), e.value);
+        }
+
+
+        //todo  :  asg grouba göre filtreleme işlemi yapılcak
+        //$("#sbAsgGroup").dxSelectBox("instance").option("value", null);
+        //$("#sbAsgGroupEmp").dxSelectBox("instance").option("value", null);
+        //if (e.value) {
+        //    if (e.value[0]) {
+        //        var reasonValue = $("#ticketForm").dxForm("instance").option("formData").reasonCategory;
+        //        var asgGroup = $("#sbAsgGroup").dxSelectBox("instance").getDataSource().items();
+        //        var itemAsgGroup = [];
+        //        //$("#sbAsgGroup").dxSelectBox("instance").getDataSource()
+        //        asgGroup.filter(function (e2) {
+        //            if (e2.reasonId == reasonValue[0]) {
+        //                itemAsgGroup.push(e2);
+        //            }
+        //        })
+        //        if (itemAsgGroup.length != 0) {
+        //            $("#sbAsgGroup").dxSelectBox("instance").option("items", itemAsgGroup);
+        //        }
+        //        else {
+        //            $("#sbAsgGroup").dxSelectBox("instance").getDataSource().reload();
+        //        }
+        //    }
+        //}
+        //else {
+        //    $("#sbAsgGroup").dxSelectBox("instance").getDataSource().filter(null);
+        //    $("#sbAsgGroup").dxSelectBox("instance").getDataSource().reload();
+        //}
+    }
+
+    function TicketRelatedLocationsFunc(container, options) {
+        if (options.data.TicketRelatedLocations == null) {
+            return;
+        }
+        let myArr = options.data.Attachments = options.data.TicketRelatedLocations
+        let result;
+        myArr.forEach((index, idx, array) => {
+
+            $('<div style="font-weight:700"/>').addClass('dx-text')
+                .text(index.TicketLocation.LocationName)
+                .appendTo(container);
+
+        });
+        return result;
+    }
+
+    function TicketNoteGridCellTemplate(container, options) {
+        
+        if (options.data.Attachments == null) {
+            return;
+        }
+        
+        let myArr = options.data.Attachments;
+
+        myArr.forEach((index, array) => {
+            $('<a/>').addClass('dx-link')
+                .text(index.FolderName)
+                .on('dxclick', function () {
+                    var url = `Tickets?handler=File&fileName=${index.FolderName}`;
+                    $.ajax({
+                        type: 'GET',
+                        url: url,
+                        data: { "fileName": index.FolderName },
+                        beforeSend: function (xhr) {
+                        },
+                        success: function (data) {
+
+                            window.location = url;
+                        }
+                    });
+                })
+                .append("<br />")
+                .appendTo(container)
+        });
+    }
+
+    function ticketAttachmentGridCellTemplate(container, options) {       
+        if (options.data == null) {
+            return;
+        }
+
+        var folderName = options.data.FolderName;
+
+        $('<a/>').addClass('dx-link')
+            .text(folderName)
+                .on('dxclick', function () {
+                    var url = `Tickets?handler=File&fileName=${folderName}`;
+                    $.ajax({
+                        type: 'GET',
+                        url: url,
+                        data: { "fileName": folderName},
+                        beforeSend: function (xhr) {
+                            //xhr.setRequestHeader('Authorization', sessionStorage.getItem("token"));
+                        },
+                        success: function (data) {
+
+                            window.location = url;
+                        }
+                    });
+                })
+                .append("<br />")
+                .appendTo(container)
+
+    }
+
+    function onSelectionChanged(data) {        
+        let rowData = data.selectedRowsData[0];
+        if (!rowData)
+            return;
+        dataRow = rowData;
+    }
+
+    function onSelectionChangedDpButton(e) {
+        
+    }
+
+    function btn_ticketStateOnClick(e) {
+        
+        dataRow.TicketStatusId = e.itemData.Id;        
+
+        var url = `http://localhost:33400/TicketWrapper/UpdateStatu`;
+
+        $.ajax({
+            type: "POST",
+            url: url,
+            headers:
+            {
+                "RequestVerificationToken": $('input:hidden[name="__RequestVerificationToken"]').val()
+            },
+            data: JSON.stringify(dataRow),
+            contentType: "application/json; charset=utf-8",
+            async: true,
+            dataType: "json",
+            success: function (response) {
+                $("#gridTicket").dxDataGrid("instance").refresh();
+            },
+            failure: function (response) {
+                alert(response);
+            }
+        });
+
+
+        if (!dataRow) return;
+        
+        
+    }
+
+    
+
+</script>
+
+
+
+<style>
+    .accordion {
+        padding: 5px;
+    }
+
+    #accordion h1,
+    #accordion p {
+        margin: 0;
+    }
+
+    #accordion h1 {
+        font-size: 20px;
+    }
+</style>
+
+<style>
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+
+    .title h3 {
+        font-family: 'Segoe UI Light', 'Helvetica Neue Light', 'Segoe UI', 'Helvetica Neue', 'Trebuchet MS', Verdana;
+        font-weight: 200;
+        font-size: 24px;
+        text-align: center;
+    }
+
+    #gridTicket {
+        padding - left: 10px;
+        padding-right: 10px;
+    }
+
+    .btn-group {
+        display: block;
+        text-align: right;
+        margin-right: 10px;
+        margin-bottom: 5px;
+    }
+
+    img {
+        height: 25px;
+        width: 25px;
+        display: block;
+    }
+    
+
+    #btn_refresh {
+        text - align: center;
+        height: 38px;
+    }
+</style>
+
+<style>
+
+    #frmTicket {
+        padding: 20px;
+    }
+</style>
+
+<style>
+
+    #ticketForm {
+        padding: 10px;
+    }
+
+    #textTicketNote {
+        margin: 20px;
+    }
+
+    #ticketNotesGrid {
+        margin: 20px;
+    }
+
+    #ticketAttachmentGrid {
+        margin: 20px;
+    }
+
+    #ticketHistory {
+        margin: 20px;
+    }
+
+    .edit-actions {
+        width: 100%;
+        margin-top: 10px;
+        text-align: right;
+    }
+
+    .dx-overlay-modal .edit-label {
+        width: 100%;
+        margin-bottom: 10px;
+        font-size: 16px;
+        color: #828282;
+        font-weight: bold;
+        border-bottom: 1px solid #828282;
+    }
+
+    .content h4 {
+        margin-bottom: 10px;
+        font-weight: 500;
+        font-size: 18px;
+    }
+
+    .content {
+        margin-top: 50px;
+        margin-left: 10px;
+    }
+
+    .selected-item {
+        margin-bottom: 20px;
+    }
+
+    #selected-files {
+        display: none;
+    }
+
+    #fileuploader-container {
+        border: 1px solid #d3d3d3;
+        margin: 20px 20px 0 20px;
+    }
+</style>
+
+
+

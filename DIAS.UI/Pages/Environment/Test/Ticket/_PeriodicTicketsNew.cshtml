@@ -1,0 +1,33 @@
+﻿@(Html.DevExtreme().Form().ID("frmPeriodicTicket")
+        .ColCount(3).ShowColonAfterLabel(false)
+        .LabelLocation(FormLabelLocation.Top)
+        .Items(items =>
+        {
+            items.AddSimple().Label(l => l.Text("Plan Adı")).Editor(e => e.TextBox().ID("txtPeriodicTicketName").ShowClearButton(true)).ValidationRules(v => v.AddRequired().Message("Plan adı boş geçilemez."));
+            items.AddSimple().Label(l => l.Text("Başlangıç Tarihi")).Editor(e => e.DateBox().ID("dateStart")).ValidationRules(v => v.AddRequired().Message("Başlangıç tarihi boş geçilemez"));
+            items.AddSimple().Label(l => l.Text("Bitiş Tarihi")).Editor(e => e.DateBox().ID("dateEnd")).ValidationRules(v => v.AddRequired().Message("Bitiş tarihi boş geçilemez"));
+            items.AddSimple().ColSpan(2).Label(l => l.Text("Arama Nedeni"))
+                .Template(@<text> @await Html.PartialAsync("../Shared/_ReasonSingle") </text>).ValidationRules(v => v.AddRequired().Message("Arama nedeni boş geçilemez"));
+            items.AddSimple().Label(l => l.Text("Öncelik"))
+                .Template(@<text> @await Html.PartialAsync("../Shared/_TicketPriority") </text>);
+            items.AddSimple().ColSpan(2).Label(l => l.Text("Mahal"))
+                .Template(@<text> @await Html.PartialAsync("../Shared/_LocationMultiple") </text>).ValidationRules(v => v.AddRequired().Message("Mahal bilgisi boş geçilemez"));
+            items.AddSimple().Label(l => l.Text("Sorumlu Kişi"))
+                .Template(@<text> @await Html.PartialAsync("../Shared/_TicketUser") </text>);
+            items.AddSimple().Label(l => l.Text("Açıklama")).Editor(e => e.TextArea().ID("textAreaDescription").Placeholder("Açıklama").Height(175));
+            items.AddSimple().ColSpan(2)
+                .Template(@<text> @await Html.PartialAsync("_PeriodicTicketsConfiguration") </text>);
+            items.AddButton().ColSpan(3)
+                .ButtonOptions(a => a.Text("Kaydet")
+                .Icon("fas fa-save")
+                .Type(ButtonType.Success)
+                //.OnClick("Tickets.saveTicket")
+                .UseSubmitBehavior(true)
+                .Hint("Kaydet"))
+                .HorizontalAlignment(HorizontalAlignment.Right);
+        }
+))
+
+
+<style>
+</style>
