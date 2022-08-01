@@ -1,0 +1,67 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="11.0.1" />
+    <PackageReference Include="LinqKit.Microsoft.EntityFrameworkCore" Version="6.1.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.4" />
+    <PackageReference Include="NLog" Version="4.7.15" />
+    <PackageReference Include="NLog.Web.AspNetCore" Version="4.14.0" />
+    <PackageReference Include="SimpleInjector" Version="5.3.3" />
+    <PackageReference Include="SimpleInjector.Packaging" Version="5.0.0" />
+    <PackageReference Include="System.ComponentModel" Version="4.3.0" />
+    <PackageReference Include="System.Linq.Async" Version="6.0.1" />
+    <PackageReference Include="System.Linq.Async.Queryable" Version="6.0.1" />
+    <PackageReference Include="System.Reflection" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DiasDataAccessLayer\DiasDataAccessLayer.csproj">
+      <Private>true</Private>
+      <CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\DiasProjectShared\DiasShared.csproj">
+      <Private>true</Private>
+      <CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="AutoMapper\EF_Automapper\DiasFacilityManagementSqlServer\Profiles\CustomProfiles\Live\" />
+    <Folder Include="AutoMapper\EF_Automapper\DiasFacilityManagementSqlServer\Profiles\StandartProfiles\Live\" />
+    <Folder Include="BusinessRules\DiasFacilityManagementSqlServer\AzureService\StorageBlob\Development\Custom\" />
+    <Folder Include="BusinessRules\DiasFacilityManagementSqlServer\AzureService\StorageBlob\Live\Custom\" />
+    <Folder Include="BusinessRules\DiasFacilityManagementSqlServer\AzureService\StorageBlob\Live\Standart\" />
+    <Folder Include="BusinessRules\DiasFacilityManagementSqlServer\AzureService\StorageBlob\Test\Custom\" />
+    <Folder Include="BusinessRules\DiasFacilityManagementSqlServer\AzureService\StorageBlob\Test\Standart\" />
+    <Folder Include="BusinessRules\DiasFacilityManagementSqlServer\SqlServer\Live\Custom\" />
+    <Folder Include="BusinessRules\DiasFacilityManagementSqlServer\SqlServer\Live\Standart\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\Base\AzureService\Custom\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\CustomIdentity\Live\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\CustomIdentity\Test\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\DiasFacilityManagementSqlServer\AzureService\Development\Custom\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\DiasFacilityManagementSqlServer\AzureService\Live\Custom\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\DiasFacilityManagementSqlServer\AzureService\Live\Standart\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\DiasFacilityManagementSqlServer\AzureService\Test\Custom\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\DiasFacilityManagementSqlServer\AzureService\Test\Standart\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\DiasFacilityManagementSqlServer\SqlServer\Live\Custom\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\DiasFacilityManagementSqlServer\SqlServer\Live\Standart\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\BusinessRules\Generic\DiasFacilityManagementSqlServer\Live\" />
+    <Folder Include="Shared\Classes\Identity\Live\" />
+    <Folder Include="Shared\Classes\Identity\Test\" />
+    <Folder Include="Shared\GenericMethods\DiasFacilityManagementSqlServer\Custom\Live\" />
+    <Folder Include="Shared\GenericMethods\DiasFacilityManagementSqlServer\Standart\Live\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appSettingsBusinessLogic.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

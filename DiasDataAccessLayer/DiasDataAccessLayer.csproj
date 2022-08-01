@@ -1,0 +1,65 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="DataAccessLayers\EF_Layers\DiasWorkOrder\**" />
+    <EmbeddedResource Remove="DataAccessLayers\EF_Layers\DiasWorkOrder\**" />
+    <None Remove="DataAccessLayers\EF_Layers\DiasWorkOrder\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.11.0" />
+    <PackageReference Include="EntityFrameworkCore.SqlServer.HierarchyId" Version="3.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="6.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer.NetTopologySuite" Version="6.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="DataAccessLayers\EF_Layers\DiasFacilityManagement\SqlServer\Live\Models\" />
+    <Folder Include="DataAccessLayers\EF_Layers\DiasFacilityManagement\SqlServer\Live\StaticDatabaseContext\" />
+    <Folder Include="DataAccessLayers\EF_Layers\DiasFacilityManagementTemplate\SqlServer\Live\" />
+    <Folder Include="DataAccessLayers\EF_Layers\DiasFacilityManagementTemplate\SqlServer\Test\" />
+    <Folder Include="DataAccessLayers\EF_Layers\IdentityManagement_DFMSqlServer\SqlServer\Live\" />
+    <Folder Include="DataAccessLayers\EF_Layers\IdentityManagement_DFMSqlServer\SqlServer\Test\" />
+    <Folder Include="DataAccessLayers\EF_Layers\IdentityManagement_DFMTemplateSqlServer\SqlServer\Live\" />
+    <Folder Include="DataAccessLayers\EF_Layers\IdentityManagement_DFMTemplateSqlServer\SqlServer\Test\" />
+    <Folder Include="DataAccessLayers\StorageLayers\Cloud\Azure\Live\Models\" />
+    <Folder Include="DataAccessLayers\StorageLayers\Cloud\Azure\Test\Models\" />
+    <Folder Include="InterfacesAbstracts\Abstracts\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\DataAccessLayers\EF_Layers\DiasFacilityManagementTemplate\SqlServer\Live\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\DataAccessLayers\EF_Layers\DiasFacilityManagementTemplate\SqlServer\Test\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\DataAccessLayers\EF_Layers\DiasFacilityManagement\SqlServer\Live\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\DataAccessLayers\EF_Layers\IdentityManagement_DFMTemplate\SqlServer\Live\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\DataAccessLayers\EF_Layers\IdentityManagement_DFMTemplate\SqlServer\Test\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\DataAccessLayers\EF_Layers\IdentityManagement_DFM\SqlServer\Live\" />
+    <Folder Include="InterfacesAbstracts\Interfaces\DataAccessLayers\EF_Layers\IdentityManagement_DFM\SqlServer\Test\" />
+    <Folder Include="Migrations\DiasFacilityManagementTemplate\SqlServer\Development\" />
+    <Folder Include="Migrations\DiasFacilityManagement\SqlServer\Development\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DiasProjectShared\DiasShared.csproj">
+      <Private>true</Private>
+      <CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appSettingsDataAccessLayer.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

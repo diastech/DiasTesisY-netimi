@@ -1,0 +1,410 @@
+﻿@page
+@model DIAS.UI.Pages.Definition.LocationDefinitionModel
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Custom
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@using DIAS.UI.Helpers
+@{
+}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/3.8.0/exceljs.min.js" defer></script>
+
+<div id="tree-list-demo">
+    @(Html.DevExtreme().TreeList<CustomLocationDto>()
+        .ID("locationDefinitionGrid")
+        .DataSource(d => d.RemoteController()
+        .OnBeforeSend("onBeforeSendLocation")
+        .Key("HierarchyId")
+        .LoadUrl(Url.Page(null, "LocationData"))
+        .InsertUrl(Url.Page(null, "InsertLocation"))
+        .UpdateUrl(Url.Page(null, "UpdateLocation"))
+        .DeleteUrl(Url.Page(null, "RemoveLocation"))
+        .LoadMode(DataSourceLoadMode.Raw))
+        .KeyExpr("HierarchyId")
+        .ParentIdExpr("ParentHierarchy")
+        .WordWrapEnabled(true)
+        .OnCellPrepared("onCellPreparedLocation")
+        .OnToolbarPreparing("onToolbarPreparingLocation")
+        .ShowBorders(true)
+        .ColumnAutoWidth(true)
+        .ShowRowLines(true)
+        .FocusedRowEnabled(true)
+        .FilterRow(filterRow => filterRow.Visible(true))
+        .OnEditingStart("onEditinStartLocationDefinition")
+        .OnInitNewRow("onInitNewRowLocationDefinition")
+        .OnRowRemoving("onRowRemovingLocationDefinition")
+        .Editing(editing => editing
+        .Mode(GridEditMode.Form).Form(f=>f.Items(items=>
+        {
+            items.AddSimpleFor(m => m.LocationOriginalName).Label(l => l.Text("Lokasyon İsmi").Visible(true)).Editor(e => e.TextBox().ID("locationDefinitionName").Placeholder("İsim Giriniz..."))
+                .ValidationRules(v =>
+                {
+                    v.AddRequired().Message("İsim Alanı Boş Geçilemez");
+                });
+
+            items.AddSimpleFor(m => m.LocationNumber).Label(l => l.Text("Lokasyon Numarası").Visible(true)).Editor(e => e.TextBox().ID("locationDefinitionNumber").Placeholder("İsim Giriniz..."))
+                .ValidationRules(v =>
+                {
+                    v.AddRequired().Message("İsim Alanı Boş Geçilemez");
+                });
+
+            items.AddSimpleFor(m => m.LocationDescription).Label(l => l.Text("Lokasyon Açıklaması").Visible(true)).Editor(e => e.TextBox().ID("locationDefinitionDescription").Placeholder("İsim Giriniz..."));
+
+            items.AddSimpleFor(m => m.NFC_Code).Label(l => l.Text("NFC Kodu").Visible(true)).Editor(e => e.TextBox().ID("locationDefinitionNFC_Code").Placeholder("İsim Giriniz..."));
+
+        }).AlignItemLabels(true)
+            .ID("formLocationDefinition"))
+            .UseIcons(true)
+            .AllowAdding(true)
+            .AllowUpdating(true)
+            .AllowDeleting(true)
+        )
+        .Columns(columns => {
+            columns.AddFor(m => m.LocationOriginalName).Caption("Lokasyon İsmi");
+            columns.AddFor(m => m.LocationNumber).Caption("Lokasyon Numarası");
+            columns.AddFor(m => m.LocationDescription).Caption("Lokasyon Açıklaması");
+            columns.AddFor(m => m.NFC_Code).Caption("NFC Kodu");
+        })
+    )
+</div>
+        
+
+<script type="text/javascript">
+
+    let rowEditingData;
+    let rowDeletingData;
+
+    function onEditinStartLocationDefinition(e) {        
+        rowEditingData = e.data;
+    }
+    function onInitNewRowLocationDefinition(e) {
+        rowEditingData = null;
+        rowDeletingData = null;
+    }
+    function onRowRemovingLocationDefinition(e) {        
+        rowDeletingData = e.data;
+    }
+
+    function onBeforeSendLocation(type, e) {
+        var ajaxHeader = {};
+            ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+        if (type == "insert")
+        {
+            var model = JSON.parse(e.data.values);
+            var formData = new FormData();            
+
+            formData.append("LocationOriginalName", model.LocationOriginalName);
+            formData.append("LocationNumber", model.LocationNumber);
+            formData.append("ParentHierarchyFromUI", model.ParentHierarchy);
+
+            formData.append("LocationDescription", $("#locationDefinitionDescription").dxTextBox("instance").option("value"));
+            formData.append("NFC_Code", $("#locationDefinitionNFC_Code").dxTextBox("instance").option("value"));
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+        if (type == "update"){
+            var formData = new FormData();                        
+            formData.append("LocationOriginalName", $("#locationDefinitionName").dxTextBox("instance").option("value"));
+            formData.append("LocationNumber", $("#locationDefinitionNumber").dxTextBox("instance").option("value"));
+            formData.append("HierarchyId", rowEditingData.HierarchyId);
+            formData.append("LocationDescription", $("#locationDefinitionDescription").dxTextBox("instance").option("value"));
+            formData.append("NFC_Code", $("#locationDefinitionNFC_Code").dxTextBox("instance").option("value"));
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+        if (type == "delete") {
+            var formData = new FormData();
+            //formData.append("LocationOriginalName", $("#locationDefinitionName").dxTextBox("instance").option("value"));
+            //formData.append("LocationNumber", $("#locationDefinitionNumber").dxNumberBox("instance").option("value"));
+            formData.append("HierarchyId", rowDeletingData.HierarchyId);
+            //formData.append("LocationDescription", $("#locationDefinitionDescription").dxTextBox("instance").option("value"));
+            //formData.append("NFC_Code", $("#locationDefinitionNFC_Code").dxTextBox("instance").option("value"));
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+    }
+
+    function onToolbarPreparingLocation(e) {
+        e.toolbarOptions.items[0].visible = false;
+    }
+
+    function onCellPreparedLocation(e) {
+        if (e.rowType == 'data') {
+            if (e.column.command =="edit") {
+                if (e.data.HierarchyId == "/") {
+                    e.cellElement.children().remove();
+                }
+            }
+            
+        }
+    }
+
+    
+</script>
+
+@*<script type="text/javascript">
+        var data;
+
+        //update ederken datayı almak için
+        function onEditingStartLocationDefinition(e) {
+            data = e.data;
+        }
+
+        //crate işleminde data doluysa değerini null yapıyoruz.
+        function OnInitNewRowLocationDefinition(e) {
+            data = null;
+        }
+        //Gridin ait olduğu ekle buttonunun customize edildiği yer.
+        function onToolbarPreparingLocationDefinition(e) {
+            e.toolbarOptions.items[0].showText = "always";
+            e.toolbarOptions.items[0].options.text = "Mahal Ekle";
+            e.toolbarOptions.items[0].options.icon = "plus";
+            e.toolbarOptions.items[0].options.type = "success";
+        }
+
+        //Seçilen row un içindeki datasını setlemek için;
+        function onSelectionChangedLocationDefinition(data) {
+            let rowData = data.selectedRowsData[0];
+            if (!rowData)
+                return;
+            dataRow = rowData;
+        }
+
+        //Popup açıldığında tetiklenen Fonksiyon
+        function setPopupTitleLocationDefinition(e) {
+
+            if (data == null) {
+                $("#popupLocationDefinitionContainer").dxPopup("instance").option("height", "55%");
+                $("#popupLocationDefinitionContainer").dxPopup("instance").option("toolbarItems[0].toolbar", "top");
+                $("#popupLocationDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.icon", "save");
+                $("#popupLocationDefinitionContainer").dxPopup("instance").option("toolbarItems[0].options.type", "success");
+                $("#popupLocationDefinitionContainer").dxPopup("instance").option("toolbarItems[1].toolbar", "top");
+                $("#popupLocationDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.text", "Kapat");
+                $("#popupLocationDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.icon", "close");
+                $("#popupLocationDefinitionContainer").dxPopup("instance").option("toolbarItems[1].options.type", "default");
+                $(".dx-toolbar-before").children().children().children().prepend("<i class='fas fa-building' style='padding-right:6px;'></i>");
+                $(".dx-toolbar-before").children().children().children().css("width", "fit-content");
+            }
+            if (data != null) {
+                $("#popupLocationDefinitionContainer").dxPopup({
+                    title: "Mahal Düzenle",
+                });
+
+                //Model base tanımları
+                $("#locationDefinitionCode").dxTextBox("instance").option("value", data.LocationCode);
+                $("#LocationDefinitionName").dxTextBox("instance").option("value", data.LocationName);
+
+                //ForeignKey Değişkenler
+                $("#sbFacilityLocation").dxSelectBox("instance").option("value", data.LocationCodeId);
+                $("#sbBuildingLocation").dxSelectBox("instance").option("value", data.BuildingId);
+                $("#sbFloorLocation").dxSelectBox("instance").option("value", data.FloorId);
+                $("#sbWingLocation").dxSelectBox("instance").option("value", data.WingId);
+
+            }
+        }
+
+        //CRUD işlemleri yapılan fonksiyon
+        function beforeSendLocationDefinition(type, e) {
+            if (type == "load") return;
+
+            //Update
+            if (type == "update") {
+                var ajaxHeader = {};
+            ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+            //Model base tanımları
+            var LocationCode = $("#locationDefinitionCode").dxTextBox("instance").option("value");
+            var LocationName = $("#LocationDefinitionName").dxTextBox("instance").option("value");
+
+
+            //ForeignKey Değişkenler
+            var LocationCodeId =$("#sbFacilityLocation").dxSelectBox("instance").option("value");
+            var BuildingId =$("#sbBuildingLocation").dxSelectBox("instance").option("value");
+            var FloorId =$("#sbFloorLocation").dxSelectBox("instance").option("value");
+            var WingId =$("#sbWingLocation").dxSelectBox("instance").option("value");
+
+
+            var formData = new FormData();
+            formData.append("Id", data.Id);
+            formData.append("AddedTime", data.AddedTime);
+            formData.append("IsDeleted", data.IsDeleted);
+            formData.append("IsActive", data.IsActive);
+            formData.append("LocationName", LocationName);
+            formData.append("LocationCode", LocationCode);
+            formData.append("LocationCodeId", LocationCodeId);
+            formData.append("BuildingId", BuildingId);
+            formData.append("FloorId", FloorId);
+            formData.append("WingId", WingId);
+
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+            }
+
+            //Insert
+            if (type == "insert") {
+            var ajaxHeader = {};
+            ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+            //Model base tanımları
+            var LocationCode = $("#locationDefinitionCode").dxTextBox("instance").option("value");
+            var LocationName = $("#LocationDefinitionName").dxTextBox("instance").option("value");
+
+            //ForeignKey Değişkenler
+            var LocationCodeId = $("#sbFacilityLocation").dxSelectBox("instance").option("value");
+            var BuildingId = $("#sbBuildingLocation").dxSelectBox("instance").option("value");
+            var FloorId = $("#sbFloorLocation").dxSelectBox("instance").option("value");
+            var WingId = $("#sbWingLocation").dxSelectBox("instance").option("value");
+
+            var formData = new FormData();
+            formData.append("Id", data.Id);
+            formData.append("AddedTime", data.AddedTime);
+            formData.append("IsDeleted", data.IsDeleted);
+            formData.append("IsActive", data.IsActive);
+            formData.append("LocationCode", LocationCode);
+            formData.append("LocationName", LocationName);
+            formData.append("LocationCodeId", LocationCodeId);
+            formData.append("BuildingId", BuildingId);
+            formData.append("FloorId", FloorId);
+            formData.append("WingId", WingId);
+
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+            }
+
+            //delete
+            if (type == "delete") {
+                var Id = e.data.key;
+                var ajaxHeader = {};
+                ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+                var formData = new FormData();
+                formData.append("Id", Id);
+                e.data = formData;
+                e.contentType = false;
+                e.processData = false;
+                e.headers = ajaxHeader;
+            }
+        }
+
+        //Data Exporting with excel Helper
+        function LocationDefinitionGridDataExporting(e){
+            let workbook = new ExcelJS.Workbook();
+            let worksheet = workbook.addWorksheet('LocationDefinition');
+
+            DevExpress.excelExporter.exportDataGrid({
+                component: e.component,
+                worksheet: worksheet,
+                autoFilterEnabled: true
+            }).then(function () {
+                workbook.xlsx.writeBuffer().then(function (buffer) {
+                    saveAs(new Blob([buffer], { type: 'application/octet-stream' }), 'Mahaller.xlsx');
+                });
+            });
+            e.cancel = true;
+        }
+
+        //Default gelen düzenle butonunu customize ettiğimiz yer
+        function onCellPreparedLocationDefinition(e) {
+            if (e.column.type == "buttons") {
+                e.cellElement.children().removeClass('dx-icon-edit').addClass("dx-icon-search");
+                e.cellElement.children().attr("title", "Detay");
+            }
+        }
+    </script>*@
+
+<style>
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+
+    .dx-datagrid-column-chooser-button {
+        background-color: #337ab7;
+    }
+
+    .dx-datagrid-export-button {
+        background-color: #337ab7;
+    }
+
+    .dx-icon-export-to {
+        color: white !important;
+    }
+
+    .dx-icon-column-chooser {
+        color: white !important;
+    }
+
+    .dx-icon-export-excel-button {
+        color: white !important;
+    }
+
+    .dx-datagrid-export-button.dx-state-hover {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-export-button.dx-state-active {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-hover {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-active {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-content .dx-datagrid-table .dx-row .dx-command-edit {
+        min-width: 40px;
+    }
+
+    [aria-label="Kaydet"]:hover {
+        background-color: #46a046;
+    }
+
+    [aria-label="Kaydet"] {
+        background-color: #5cb85c;
+        color: white;
+    }
+
+    [aria-label="Save"]:hover {
+        background-color: #46a046;
+    }
+
+    [aria-label="Save"] {
+        background-color: #5cb85c;
+        color: white;
+    }
+
+    [aria-label="İptal"]:hover {
+        background-color: #337ab7;
+    }
+
+    [aria-label="İptal"] {
+        background-color: #296293;
+        color: white;
+    }
+
+    [aria-label="Cancel"]:hover {
+        background-color: #337ab7;
+    }
+
+    [aria-label="Cancel"] {
+        background-color: #296293;
+        color: white;
+    }
+</style>
