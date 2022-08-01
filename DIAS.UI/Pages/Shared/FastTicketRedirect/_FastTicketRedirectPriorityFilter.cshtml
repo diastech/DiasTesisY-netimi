@@ -1,0 +1,15 @@
+﻿@(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbFastTicketRedirectPriority")
+                .DataSource(d => d.RemoteController()
+                .Key("Id")
+                .LoadUrl(Url.Page(null, "TicketPriorityData")))
+                .DisplayExpr("Name")
+                .ShowClearButton(true)
+                .DeferRendering(false)
+                .SearchEnabled(true)
+                .Placeholder("Öncelik seçiniz.")
+                .ValueExpr("Id")
+                )
+                
+                

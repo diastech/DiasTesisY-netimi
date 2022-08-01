@@ -1,0 +1,18 @@
+﻿@(Html.DevExtreme()
+    .DropDownBox()
+    .ID("dropDownReason")
+    .DataSource(
+        new JS("Reason.reasonDataSource()")
+    )
+    .ValueExpr("reasonCategory")
+    .DisplayExpr("reasonCategoryName")
+    .DropDownOptions(o => o.Height(350))
+    .Placeholder("Lütfen Seçiniz..")
+    .ShowClearButton(true)
+    .OnValueChanged("Reason.treeBoxMulti_valueChanged")
+    .ContentTemplate(
+        @<text>
+            @await Html.PartialAsync("_ReasonTreeViewMultiple")
+        </text>
+    )
+)

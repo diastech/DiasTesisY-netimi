@@ -1,0 +1,372 @@
+﻿@page
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Standard
+@using static DiasShared.Enums.Standart.TicketEnums
+@model DIAS.UI.Pages.Definition.TicketDefinitions.BasicTicketStateModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@{
+}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/polyfills.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.14/jspdf.plugin.autotable.min.js"></script>
+<script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.es.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.5.23/dist/jspdf.plugin.autotable.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/3.8.0/exceljs.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" defer></script>
+<script src="~/helper/trCharHelper.js"></script>
+<script>
+    window.jsPDF = window.jspdf.jsPDF;
+    applyPlugin(window.jsPDF);
+</script>
+
+
+<div class="card">
+    <div class="card-body">
+        @(Html.DevExtreme().DataGrid<BasicTicketStateDto>()
+                            .ID("gridTicket")
+                            .DataSource(ds => ds.RemoteController()
+                            .OnBeforeSend("beforeSendBasicTicketStateDefinition")
+                            .Key("Id")
+                            .LoadUrl(Url.Page(null, "GridData"))
+                            .InsertUrl(Url.Page(null, "GridRow"))
+                            .UpdateUrl(Url.Page(null, "GridRowUpdate"))
+                            .DeleteUrl(Url.Page(null, "GridRowDelete"))
+                        )
+                            .ColumnChooser(c => c.Enabled(true).AllowSearch(true).Mode(GridColumnChooserMode.Select))
+                            .HeaderFilter(o=>o.AllowSearch(true))
+                            .FilterRow(o => o.Visible(true))
+                            .Selection(s => s.Mode(SelectionMode.Single))
+                            .Export(o => o.Enabled(true).AllowExportSelectedData(true))
+                            .OnExporting("basicTicketStateDefinitionGridDataExporting")
+                            .OnSelectionChanged("onSelectionChangedBasicTicketStateDefinition")
+                            .OnToolbarPreparing("onToolbarPreparingBasicTicketStateDefinition")
+                            .OnContentReady("onContentReadyBasicTicketStateDefinition")
+                            .OnCellPrepared("onCellPreparedBasicTicketStateDefinition")
+                        .RemoteOperations(true)
+                            .ShowBorders(true)
+                            .Paging(p => p.Enabled(false))
+                        .Editing(e => e.Mode(GridEditMode.Popup)
+                                .AllowUpdating(true)
+                                .AllowDeleting(true)
+                                .AllowAdding(true)
+                                .UseIcons(true)
+                                .EditColumnName("Düzenle")
+                                .SelectTextOnEditStart(true)
+                                .StartEditAction(GridStartEditAction.DblClick)
+                                .Popup(p => p
+                                    .Title("Yeni Hızlı İş Emri Durumu")
+                                    .ID("popupContainerBasicTicketStateDefinition")
+                                    .ShowTitle(true)
+                                    .Width(700)
+                                    .Height(525)
+                                    .OnShowing("setPopupTitleBasicTicketStateDefinition")
+                                    .ShowCloseButton(true)
+                                )
+                            .Form(f => f.Items(items =>
+                            {
+                                items.AddGroup()
+                                    .Items(groupItems =>
+                                    {
+                                        groupItems.AddTabbed()
+                    .TabPanelOptions(o =>
+                    {
+                        o.DeferRendering(false);
+                        o.AnimationEnabled(true);
+                        o.ID("ticketBasicTicketTab");
+                        o.Width(650);
+                        o.AnimationEnabled(true);
+                        o.ShowNavButtons(true);
+                        o.Height("100%");
+                    })
+                    .Tabs(tabItems =>
+                    {
+                        tabItems.Add().Icon("fas fa-save")
+                    .Title("Hızlı İş Emri Durumu")
+                    .Items(tabItem =>
+                    {
+                        tabItem.AddSimpleFor(m => m.Name)
+        .Label(l => l.Text("Açıklama").Visible(true)).Editor(e => e.TextBox().ID("basicTicketStateDescription")
+        .Placeholder("Açıklama giriniz...").Height(50))
+                        .ValidationRules(v =>
+                        {
+                            v.AddRequired().Message("Açıklama Alanı Boş Olamaz");
+                        });
+                    });
+
+                    });
+                                    });
+                                    }).ID("basicTicketStateForm")))
+        .Columns(columns =>
+        {
+        columns.AddFor(m => m.Name).Caption("İş Emri Öncelik").AllowEditing(true);
+        })
+        .OnEditingStart(@<text> function(e) {onEditingStart(e) } </text>)
+        .OnInitNewRow(@<text> function(e) { OnInitNewRow(e); } </text>)
+
+    )
+    </div>
+</div>
+
+
+<script type="text/javascript">
+    var data;
+    let attachmentFile;
+    let noteFile;
+
+    var BasicTicketStateDefinitionDataGrid;
+    const pdfOptionsOfBasicTicketStateDefinition = [
+        { Id: 1, name: 'Tüm Verileri Dışarı Aktar' },
+        { Id: 2, name: 'Seçili Satırı Dışa Aktar' }
+    ];
+    function onEditingStart(e) {
+        data = e.data;
+    }    
+    function OnInitNewRow(e) {
+
+        data = null;
+    }
+    function onToolbarPreparingBasicTicketStateDefinition(e) {
+        e.toolbarOptions.items.forEach((value, index, array) => {
+            if (value.name == "addRowButton") {
+                e.toolbarOptions.items[0].showText = "always";
+                e.toolbarOptions.items[0].options.text = "Hızlı İş Emri Durumu Ekle ";
+                e.toolbarOptions.items[0].options.icon = "plus";
+                e.toolbarOptions.items[0].options.type = "success";
+            }
+        });
+    }
+    function setPopupTitleBasicTicketStateDefinition(e) {
+
+        if (data != null) {
+            $("#popupContainerBasicTicketStateDefinition").dxPopup({
+                title: "Hızlı İş Emri Durum Düzenle",
+            });
+            $("#basicTicketStateDescription").dxTextBox("instance").option("value", data.BasicStateDescription);
+        }
+    }
+    function basicTicketStateDefinitionGridDataExporting(e) {
+        let workbook = new ExcelJS.Workbook();
+        let worksheet = workbook.addWorksheet('HızlıIsEmriDurumlari');
+        DevExpress.excelExporter.exportDataGrid({
+            component: e.component,
+            worksheet: worksheet,
+            autoFilterEnabled: true
+        }).then(function () {
+            workbook.xlsx.writeBuffer().then(function (buffer) {
+                saveAs(new Blob([buffer], { type: 'application/octet-stream' }), 'HızlıIsEmriDurumu.xlsx');
+            });
+        });
+        e.cancel = true;
+    }
+    function beforeSendBasicTicketStateDefinition(type, e) {
+
+        if (type == "load") return;
+
+        if (type == "update") {
+            var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+            var BasicStateDescription = $("#basicTicketStateDescription").dxTextBox("instance").option("value");
+
+        var formData = new FormData();
+        formData.append("Id", data.Id);
+        formData.append("AddedTime", data.AddedTime);
+        formData.append("IsDeleted", data.IsDeleted);
+        formData.append("IsActive", data.IsActive);
+        formData.append("Name", BasicStateDescription);
+        formData.append("AddedByUserId", 1);
+        e.data = formData;
+        e.contentType = false;
+        e.processData = false;
+        e.headers = ajaxHeader;
+        }
+
+        if (type == "insert") {
+            var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+            var BasicStateDescription = $("#basicTicketStateDescription").dxTextBox("instance").option("value");
+
+        var formData = new FormData();
+        formData.append("Name", BasicStateDescription);
+        formData.append("AddedByUserId", 1);
+
+        e.data = formData;
+        e.contentType = false;
+        e.processData = false;
+        e.headers = ajaxHeader;
+        }
+        if (type == "delete") {
+            var Id = e.data.key;
+            var ajaxHeader = {};
+            ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+            var formData = new FormData();
+            formData.append("Id", Id);
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+    }
+    function onSelectionChangedBasicTicketStateDefinition(data) {
+        let rowData = data.selectedRowsData[0];
+        if (!rowData)
+            return;
+        dataRow = rowData;
+    }
+    function onCellPreparedBasicTicketStateDefinition(e) {
+        if (e.column.type == "buttons") {
+            e.cellElement.children().removeClass('dx-icon-edit').addClass("dx-icon-search");
+            e.cellElement.children().attr("title", "Detay");
+        }
+    }
+    function onContentReadyBasicTicketStateDefinition(e) {
+        BasicTicketStateDefinitionDataGrid = e.component;
+        e.component.deselectRows(e.component.getSelectedRowKeys());
+        var toolbar = e.element.find('.dx-datagrid-header-panel .dx-toolbar').dxToolbar('instance');
+        //toolbar.on('optionChanged', function (arg) {
+        //    console.log("sadikl");
+        //    //addCustomItemPdfButton(toolbar);
+        //});        
+        addBasicTicketStateDefinitionCustomItemPdfButton(toolbar);
+    }
+    function addBasicTicketStateDefinitionCustomItemPdfButton(toolbar) {
+        var items = toolbar.option('items');
+        var myItem = DevExpress.data.query(items).filter(function (item) {
+            return item.name == 'btn_pdf_ticketStateDefinition';
+        }).toArray();
+        if (!myItem.length) {
+            items.push({
+                id: 'btn_pdf_basicTicketStateDefinition',
+                location: 'after',
+                widget: 'dxDropDownButton',
+                name: 'btn_pdf_basicTicketStateDefinition',
+                options: {
+                    text: 'Pdf',
+                    icon: 'save',
+                    displayExpr: 'name',
+                    keyExpr: 'Id',
+                    elementAttr: {
+                        id: "btn_pdf_basicTicketStateDefinitionId",
+                        class: "dpbColor"
+                    },
+                    dropDownOptions: {
+                        width: 230,
+                    },
+                    onItemClick: exportToPDF,
+                    items: pdfOptionsOfBasicTicketStateDefinition,
+                },
+            });
+            toolbar.option('items', items);
+        }
+    }
+    function exportToPDF(e) {
+        const pdfDoc = new jsPDF('l');
+        pdfDoc.addFileToVFS('NotoSerif-Regular-normal.ttf', myFont);
+        pdfDoc.addFont('NotoSerif-Regular-normal.ttf', 'NotoSerif-Regular', 'normal');
+        pdfDoc.setFont("NotoSerif-Regular");
+        if (e.itemData.Id == 1) {
+            const options = {
+                jsPDFDocument: pdfDoc,
+                component: BasicTicketStateDefinitionDataGrid,
+                autoTableOptions: {
+                    rowPageBreak: 'auto',
+                    bodyStyles: { valign: 'top' },
+                    styles: {
+                        font: 'NotoSerif-Regular'
+                    }
+                }
+            };
+            DevExpress.pdfExporter.exportDataGrid(options).then(() => {
+                pdfDoc.setFontSize(5);
+            }).then(() => {
+                pdfDoc.save('HızlıİşEmriDurumları.pdf');
+            });
+        }
+        if (e.itemData.Id == 2) {
+            //const pdfDoc = new jsPDF('l');
+            const options = {
+                jsPDFDocument: pdfDoc,
+                component: BasicTicketStateDefinitionDataGrid,
+                autoTableOptions: {
+                    rowPageBreak: 'auto',
+                    bodyStyles: { valign: 'top' },
+                    styles: {
+                        font: 'NotoSerif-Regular'
+                    }
+                },
+                selectedRowsOnly: true
+            };
+            DevExpress.pdfExporter.exportDataGrid(options).then(() => {
+                pdfDoc.setFontSize(5);
+            }).then(() => {
+                pdfDoc.save('HızlıİşEmriDurumları.pdf');
+            });
+        }
+    }
+</script>
+
+<style>
+    .dpbColor {
+        background-color: #337ab7;
+        border-radius: 4px;
+    }
+
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+
+    .dx-datagrid-text-content {
+        color: black;
+        font-weight: 700;
+    }
+
+    .dx-datagrid-export-button {
+        background-color: #337ab7;
+    }
+
+    /*bu ve altındaki css özelliği yazıların ve ikonların beyaz olmasını sağlamaktadır.*/
+    .dx-button-mode-outlined {
+        background-color: transparent;
+        border-color: #ddd;
+        color: white;
+    }
+
+        .dx-button-mode-outlined .dx-icon {
+            color: white;
+        }
+
+    .dx-icon-export-to {
+        color: white !important;
+    }
+
+    .dx-icon-export-excel-button {
+        color: white !important;
+    }
+
+
+    .dx-datagrid-export-button.dx-state-hover {
+        background-color: #285f8f !important;
+    }
+
+    .dx-datagrid-export-button.dx-state-active {
+        background-color: #285f8f !important;
+    }
+
+
+    .dx-datagrid-column-chooser-button {
+        background-color: #337ab7;
+    }
+
+    .dx-icon-column-chooser {
+        color: white !important;
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-hover {
+        background-color: #285f8f !important;
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-active {
+        background-color: #285f8f !important;
+    }
+</style>

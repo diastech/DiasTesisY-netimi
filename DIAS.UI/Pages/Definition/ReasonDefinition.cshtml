@@ -1,0 +1,79 @@
+﻿@page
+@model DIAS.UI.Pages.Definition.ReasonDefinitionModel
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Custom
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@using DIAS.UI.Helpers
+@{
+}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/3.8.0/exceljs.min.js" defer></script>
+<div id="tree-list-demo">
+    @(Html.DevExtreme().TreeList<CustomTicketReasonCategoryDto>()
+        .ID("reasonDefinitionGrid")
+        .DataSource(d => d.RemoteController().OnBeforeSend("onBeforeSendReason")
+        .Key("HierarchyId")
+        .LoadUrl(Url.Page(null, "ReasonData"))
+        .InsertUrl(Url.Page(null, "InsertReason"))
+        .UpdateUrl(Url.Page(null, "UpdateReason"))
+        .LoadMode(DataSourceLoadMode.Raw))
+        .KeyExpr("HierarchyId")
+        .ParentIdExpr("ParentHierarchy")
+        .WordWrapEnabled(true)
+        .ShowBorders(true)
+        .ColumnAutoWidth(true)
+        .FilterRow(filterRow => filterRow.Visible(true))
+        .ShowRowLines(true)
+        .FocusedRowEnabled(true)
+        .Editing(editing => editing
+        .Mode(GridEditMode.Form).Form(f=>f.Items(items=>
+            {
+                items.AddSimpleFor(m => m.CategoryNameToUI).Label(l => l.Text("Vaka İsmi").Visible(true)).Editor(e => e.TextBox().ID("reasonDefinitionName").Placeholder("İsim Giriniz..."))
+                    .ValidationRules(v =>
+                    {
+                        v.AddRequired().Message("İsim Alanı Boş Geçilemez");
+                    });
+                items.AddSimpleFor(m => m.ResolutionTime).Label(l => l.Text("Müdahale Süresi").Visible(true)).Editor(e => e.NumberBox().ID("reasonResolutionTime").Placeholder("Müdahale Süresi Giriniz..."))
+                    .ValidationRules(v =>
+                    {
+                        v.AddRequired().Message("Müdahale Süresi Alanı Boş Geçilemez");
+                    });
+                items.AddSimpleFor(m => m.ResponseTime).Label(l => l.Text("Çözüm Süresi")
+                .Visible(true)).Editor(e => e.NumberBox().ID("reasonResponseTime").Placeholder("Çözüm Süresi Giriniz..."))
+                    .ValidationRules(v =>
+                    {
+                        v.AddRequired().Message("Çözüm Süresi Alanı Boş Geçilemez");
+                    });
+            }).AlignItemLabels(true)
+            .ID("formReasonDefinition"))
+            .UseIcons(true)
+            .AllowAdding(true)
+            .AllowUpdating(true)
+            .AllowDeleting(true)
+        )
+        .Columns(columns => {
+            columns.AddFor(m => m.CategoryNameToUI).Caption("Kategori İsmi");
+            columns.AddFor(m => m.ResolutionTime).Caption("Müdehale Süresi");
+            columns.AddFor(m => m.ResponseTime).Caption("Çözüm Süresi");
+        })        
+    )
+</div>
+<script>    
+    function onBeforeSendReason(type, e) {
+        var ajaxHeader = {};
+            ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+        if (type == "insert")
+        {
+            var model = JSON.parse(e.data.values);
+            var formData = new FormData();
+            formData.append("ReasonNameFromUI", model.CategoryNameToUI);
+            formData.append("ReasonResolutionTimeFromUI", model.ResolutionTime);
+            formData.append("ReasonResponseTimeFromUI", model.ResponseTime)
+            formData.append("ParentHierarchyFromUI", model.ParentHierarchy)
+
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+    }
+</script>

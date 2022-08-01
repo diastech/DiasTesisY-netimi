@@ -1,0 +1,21 @@
+﻿@(Html.DevExtreme()
+    .DropDownBox()
+    .ID("dropDownLocation")    
+    .DataSource(d => d.RemoteController()
+    .Key("HierarchyId")
+    .LoadUrl(Url.Page(null, "LocationData"))
+    .LoadMode(DataSourceLoadMode.Raw))
+    .DeferRendering(false)
+    .ValueExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .DropDownOptions(o => o.Height(350))
+    .Placeholder("Lütfen Seçiniz..")
+    .ShowClearButton(true)
+    .OnValueChanged("Location.treeBox_valueChanged")
+    .ContentTemplate(
+        @<text>
+            @await Html.PartialAsync("../Shared/_LocationTreeViewMultiple")
+        </text>
+    )
+)
+

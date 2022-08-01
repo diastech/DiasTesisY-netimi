@@ -1,0 +1,28 @@
+modelBuilder.Entity<BasicTicket>(entity =>
+            {
+                entity.ToTable("BasicTicket", "usr");
+
+                entity.Property(e => e.AddedByUserId).HasDefaultValueSql("((1))");
+
+                entity.Property(e => e.AddedTime)
+                    .HasColumnType("datetime")
+                    .HasDefaultValueSql("(getdate())");
+
+                entity.Property(e => e.IsActive).HasDefaultValueSql("((1))");
+
+                entity.Property(e => e.TicketDescription)
+                    .IsRequired()
+                    .HasMaxLength(2000)
+                    .IsUnicode(false);
+
+                entity.HasOne(d => d.AddedByUser)
+                    .WithMany(p => p.BasicTicketAddedByUsers)
+                    .HasForeignKey(d => d.AddedByUserId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("FK_BasicTicket_AddedByUserId_User_Id");
+
+                entity.HasOne(d => d.LastModifiedByUser)
+                    .WithMany(p => p.BasicTicketLastModifiedByUsers)
+                    .HasForeignKey(d => d.LastModifiedByUserId)
+                    .HasConstraintName("FK_BasicTicket_LastModifiedByUserId_User_Id");
+            });

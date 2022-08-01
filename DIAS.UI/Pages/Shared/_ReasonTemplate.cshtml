@@ -1,0 +1,18 @@
+﻿@(Html.DevExtreme()
+    .DropDownBox()
+    .AcceptCustomValue(true)
+    .ID("dropDownReasonSingle")
+    .DataSource(d => d.RemoteController().LoadUrl(Url.Page(null, "TicketReasonData")).Key("HierarchyId"))
+    .DeferRendering(true)
+    .ValueExpr("HierarchyId")
+    .DisplayExpr("CategoryName")
+    .DropDownOptions(o => o.Height(350))
+    .Placeholder("Ara")
+    .ShowClearButton(true)
+    .OnValueChanged("Reason.treeBox_valueChanged")
+    .ContentTemplate(
+        @<text>
+            @await Html.PartialAsync("../Shared/_ReasonTreeViewSingle")
+        </text>
+    )
+)

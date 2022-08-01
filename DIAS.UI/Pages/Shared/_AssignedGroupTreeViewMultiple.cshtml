@@ -1,0 +1,34 @@
+﻿@(Html.DevExtreme().TreeView()
+    .DataSource(new JS(@"component.getDataSource()"))
+    .KeyExpr("HierarchyId")
+    .DisplayExpr("Name")
+    .ParentIdExpr("ParentHierarcyId")
+    .DataStructure(TreeViewDataStructure.Plain)
+    .SelectionMode(NavSelectionMode.Single)
+    .ShowCheckBoxesMode(TreeViewCheckBoxMode.Normal)
+    .SelectNodesRecursive(false)
+    .SelectByClick(true)
+    .SearchEnabled(true)
+    .Height(300)
+    .OnItemClick(
+        @<text>
+            function(args) {
+                component.close();
+            }
+        </text>
+    )
+    .OnItemSelectionChanged(
+        @<text>
+            function(args) {
+                component.option("value", args.component.getSelectedNodeKeys());
+            }
+        </text>
+    )
+    .OnContentReady(
+        @<text>
+            function(args) {
+                syncTreeViewSelectionAssigned(args.component, component.option("value"));
+            }
+        </text>
+    )
+)

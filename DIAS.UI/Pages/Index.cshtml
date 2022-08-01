@@ -1,0 +1,442 @@
+﻿@page
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Standard;
+@using static DiasShared.Enums.Standart.AuthorizationEnums;
+@using Newtonsoft.Json;
+@using DiasShared.Operations.EnumOperations;
+@using DiasShared.AuthorizationOperation;
+@using DiasShared.Extensions.JSON;
+@using DIAS_UI.Helpers;
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+
+@inject DIAS.UI.Service.CommonLocalizationService localizer
+
+@{
+    //TODO : MenuPageV2 e geçiş olmalıdır
+    //TODO: Bu veritabanından çekilecek
+    //
+    List<MenuPageDto> userPages = new List<MenuPageDto>();
+
+    string userMenuClaim = SessionHelper.GetObjectFromJson(HttpContext.Session, "userMenu");
+
+    string baseUrl = string.Format("{0}://{1}",
+                      DIAS.UI.Helpers.HttpContextHelper.Current.Request.Scheme, DIAS.UI.Helpers.HttpContextHelper.Current.Request.Host);
+
+
+    //Proje default .net core json kullandığından burada newtonsoft'u özelleştirelim(ulong enumları serialize edebilmek için)
+    JsonSerializerSettings settings = new JsonSerializerSettings
+
+    {
+        DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate,
+        NullValueHandling = NullValueHandling.Ignore,
+        ObjectCreationHandling = ObjectCreationHandling.Replace,
+        TypeNameHandling = TypeNameHandling.Auto,
+        Converters = { new FixedUlongStringEnumConverter() }
+    };
+
+    if (userMenuClaim != null)
+    {
+        var controllersActions = JsonConvert.DeserializeObject<List<Tuple<List<WebMenuHierarchicalNode>, List<string>>>>(userMenuClaim, settings);
+
+        foreach (var item in controllersActions)
+        {
+            foreach (var item2 in item.Item1)
+            {
+                if (item2.ToString() == "SystemManagement")
+                {
+                    userPages.Add(new MenuPageDto() { Id = 2, HierarchicalLevel = 0, HierarchicalOrder = 1, MenuText = "Sistem Yönetimi", MenuIcon = "fas fa-cogs", ExpandOnStart = true, AuthorizationCodeLevel = 1, AuthorizationCode = 1 });
+                }
+                if (item2.ToString() == "DescriptionOperations")
+                {
+                    userPages.Add(new MenuPageDto() { Id = 3, ParentId = 2, HierarchicalLevel = 1, HierarchicalOrder = 1, MenuText = "Tanım İşlemleri", MenuIcon = "", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 2 });
+                }
+                if (item2.ToString() == "WorkOrderDescriptions")
+                {
+                    userPages.Add(new MenuPageDto() { Id = 4, ParentId = 3, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "İş Emri Tanımları", UrlPath = "/Definition/MainDefinitionPage", MenuIcon = "fas fa-business-time", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4 });
+                    userPages.Add(new MenuPageDto() { Id = 5, ParentId = 3, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "Tesis Tanımları", UrlPath = "/Definition/FacilityDefinition", MenuIcon = "fas fa-building", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4 });
+                    userPages.Add(new MenuPageDto() { Id = 6, ParentId = 3, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "Mahal Tanımları", UrlPath = "/Definition/LocationDefinition", MenuIcon = "fab fa-buromobelexperte", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4 });
+                    userPages.Add(new MenuPageDto() { Id = 7, ParentId = 3, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "Vaka Tanımları", UrlPath = "/Definition/ReasonDefinition", MenuIcon = "fas fa-exclamation", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4 });
+                    userPages.Add(new MenuPageDto() { Id = 8, ParentId = 3, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "Kullanıcı Tanımları", UrlPath = "/Definition/UserDefinition", MenuIcon = "fas fa-user", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4 });
+                    userPages.Add(new MenuPageDto() { Id = 9, ParentId = 3, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "Rol Tanımları", UrlPath = "/Definition/RoleDefinition", MenuIcon = "fas fa-user-shield", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4 });
+                    userPages.Add(new MenuPageDto() { Id = 10, ParentId = 3, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "Soru-Anket Tanımları", UrlPath = "/Definition/SurveyQuestionDefinition/SurveyQuestionDefinition", MenuIcon = "fas fa-question", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4 });
+                    userPages.Add(new MenuPageDto() { Id = 11, ParentId = 3, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "Vaka-Soru Eşleştirme", UrlPath = "/Definition/SurveyQuestionMatchDefinition/SurveyQuestionMatchDefinition", MenuIcon = "fas fa-check-double", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4 });
+                }
+                if (item2.ToString() == "WorkOrderModule")
+                {
+                    userPages.Add(new MenuPageDto() { Id = 5, HierarchicalLevel = 0, HierarchicalOrder = 2, MenuText = "İş Emri Modülü", MenuIcon = "fas fa-clipboard", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 8 });
+                }
+                if (item2.ToString() == "WorkOrder")
+                {
+                    userPages.Add(new MenuPageDto() { Id = 6, ParentId = 5, HierarchicalLevel = 1, HierarchicalOrder = 1, MenuText = "İş Emri", UrlPath = "/Ticket/Tickets", MenuIcon = "fas fa-tasks", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 16 });
+                }
+                if (item2.ToString() == "SimpleWorkOrder")
+                {
+                    userPages.Add(new MenuPageDto() { Id = 7, ParentId = 5, HierarchicalLevel = 1, HierarchicalOrder = 2, MenuText = "Hızlı İş Emri", UrlPath = "/Ticket/FastTickets", MenuIcon = "fas fa-fighter-jet", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 32 });
+                }
+                if (item2.ToString() == "SimpleWorkOrderAssignment")
+                {
+                    userPages.Add(new MenuPageDto() { Id = 8, ParentId = 5, HierarchicalLevel = 1, HierarchicalOrder = 3, MenuText = "Hızlı İş Emri Yönlendir", UrlPath = "/Ticket/FastTicketRedirect", MenuIcon = "fas fa-map-signs", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 64 });
+                }
+                if (item2.ToString() == "PeriodicWorkOrder")
+                {
+                    userPages.Add(new MenuPageDto() { Id = 9, ParentId = 5, HierarchicalLevel = 1, HierarchicalOrder = 4, MenuText = "Planlı İş Emri", UrlPath = "/Ticket/PeriodicTickets", MenuIcon = "fas fa-calendar-alt", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 128 });
+                }
+            }
+        }
+    }
+    else
+    {
+        //string baseUrl = string.Format("{0}://{1}",
+        //               DIAS.UI.Helpers.HttpContextHelper.Current.Request.Scheme, DIAS.UI.Helpers.HttpContextHelper.Current.Request.Host);
+        //string domainName = DIAS.UI.Helpers.HttpContextHelper.Current.Request.Url.GetLeftPart(UriPartial.Authority);
+        //RedirectPermanent(string domainName = HttpContext.Current.Request.Url.GetLeftPart(UriPartial.Authority);)
+    }
+
+    string user = SessionHelper.GetObjectFromJson(HttpContext.Session, "user");
+
+    UserDto convertedUser;
+    UserDto userViewData;
+
+    if (user != null)
+    {
+
+        convertedUser = JsonConvert.DeserializeObject<UserDto>(user);
+        userViewData = convertedUser;
+    }
+    else
+    {
+        convertedUser = new();
+        userViewData = new();
+    }
+
+    //var controllersActions = JsonConvert.DeserializeObject<List<Tuple<WebMenuHierarchicalNode, List<string>>>>(controllersActionsJson);
+
+
+    //WebMenuHierarchicalNode nodeEnum = ikinciSayiYetkiKod.GetEnumValue<WebMenuHierarchicalNode>();
+    //MenuHierarchicalLevel menuHierarchy = nodeEnum.GetDisplayOrValueFromEnum<WebMenuHierarchicalNode>().
+    //                                                GetEnumValue<MenuHierarchicalLevel>();
+
+    //    List<MenuPageDto> userPages = new List<MenuPageDto>
+    //{
+    //        #region Definitions
+
+    //        new MenuPageDto(){Id= 2, HierarchicalLevel = 0, HierarchicalOrder = 1, MenuText = "Sistem Yönetimi", MenuIcon = "fas fa-cogs", ExpandOnStart = true, AuthorizationCodeLevel = 1, AuthorizationCode = 1},
+    //        new MenuPageDto(){Id= 3, ParentId = 2, HierarchicalLevel = 1, HierarchicalOrder = 1, MenuText = "Tanım İşlemleri", MenuIcon = "", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 2},
+    //        new MenuPageDto(){Id= 4, ParentId = 2, HierarchicalLevel = 2, HierarchicalOrder = 1, MenuText = "İş Emri Tanımları", UrlPath = "/Definition/MainDefinitionPage", MenuIcon = "fas fa-archive", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 4},
+
+    //        #endregion Definitions
+
+    //        #region TicketManagement
+
+    //        new MenuPageDto(){Id= 5, HierarchicalLevel = 0, HierarchicalOrder = 2, MenuText = "İş Emri Modülü", MenuIcon = "fas fa-clipboard", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 8},
+    //        new MenuPageDto(){Id= 6, ParentId = 5, HierarchicalLevel = 1, HierarchicalOrder = 1, MenuText = "İş Emri", UrlPath = "/Ticket/Tickets", MenuIcon = "fas fa-tasks", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 16},
+    //        new MenuPageDto(){Id= 7, ParentId = 5, HierarchicalLevel = 1, HierarchicalOrder = 2, MenuText = "Hızlı İş Emri", UrlPath = "/Ticket/FastTickets", MenuIcon = "fas fa-fighter-jet", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 32},
+    //        new MenuPageDto(){Id= 8, ParentId = 5, HierarchicalLevel = 1, HierarchicalOrder = 3, MenuText = "Hızlı İş Emri Yönlendir", UrlPath = "/Ticket/FastTicketRedirect", MenuIcon = "fas fa-map-signs", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 64},
+    //        new MenuPageDto(){Id= 9, ParentId = 5, HierarchicalLevel = 1, HierarchicalOrder = 4, MenuText = "Planlı İş Emri", UrlPath = "/Ticket/PeriodicTickets", MenuIcon = "fas fa-calendar-alt", ExpandOnStart = false, AuthorizationCodeLevel = 1, AuthorizationCode = 128},
+
+    //        #endregion TicketManagement
+    //    };
+
+    string lang = "";
+    lang = Configuration.GetValue<string>("defaultSystemLang");
+    if (!string.IsNullOrEmpty(Request.Cookies["userLang"]))
+        lang = Request.Cookies["userLang"];
+
+    var langList = new[]
+    {
+        new { key = "Türkçe", value = "tr" },
+        new { key = "English", value = "en" },
+        new { key = "Deutsch", value = "de" },
+    };
+}
+<script src="~/js/pages/index.js"></script>
+<script src="https://your-site-or-cdn.com/fontawesome/v6.1.1/js/all.js" data-auto-replace-svg="nest"></script>
+<body onload="Index.IndexLoad()">
+    @(Html.DevExtreme().Toolbar().ID("toolbar").Items(a=>
+        {
+            a.Add().Location(ToolbarItemLocation.Before)
+                .Widget(w => w.Button().Icon("fas fa-bars")
+                .OnClick("Index.drawerMenu_click")
+                .StylingMode(ButtonStylingMode.Outlined));
+
+            a.Add().Location(ToolbarItemLocation.Before)
+                .Template(@<text><div id="headerLogo"> </div></text>);
+
+            a.Add().Location(ToolbarItemLocation.Before)
+                .Template(@<text><b>Dias Teknoloji</b></text>);
+
+            a.Add().Location(ToolbarItemLocation.Before)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Auto)
+                .Template(@<text><div id="divFacility"></div></text>);
+
+            a.Add().Location(ToolbarItemLocation.After)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Auto)
+                .ShowText(ToolbarItemShowTextMode.InMenu)
+                .Widget(w => w.Button().ID("btnAboutPage").Text("About Page").Hint("About").Icon("fas fa-question")
+                .OnClick("Index.btnAboutPage_click").StylingMode(ButtonStylingMode.Outlined));
+
+            a.Add().Location(ToolbarItemLocation.After)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Auto)
+                .ShowText(ToolbarItemShowTextMode.InMenu)
+                .Widget(w => w.Button().ID("btnChangePassword").Text("Change Password").Hint("Change Password").Icon("fas fa-key")
+                .OnClick("Index.btnChangePassword_click").StylingMode(ButtonStylingMode.Outlined));
+
+            a.Add().Location(ToolbarItemLocation.After)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Auto)
+                .ShowText(ToolbarItemShowTextMode.InMenu)
+                .Widget(w => w.Button().ID("btnHelpDesk").Text("Report a Bug").Hint("Report a Bug").Icon("fas fa-bug")
+                .OnClick("Index.btnHelpDesk_click").StylingMode(ButtonStylingMode.Outlined));
+
+            a.Add().Location(ToolbarItemLocation.After)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Auto)
+                .ShowText(ToolbarItemShowTextMode.InMenu)
+                .Widget(w => w.Button().ID("btnChangeFacility").Text("Change Facility").Hint("Change Facility").Icon("fas fa-industry")
+                .OnClick("Index.btnChangeFacility_click").StylingMode(ButtonStylingMode.Outlined));
+
+            a.Add().Location(ToolbarItemLocation.After)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Auto)
+                .ShowText(ToolbarItemShowTextMode.InMenu)
+                .Widget(w => w.Button().ID("btnRefresh").Text("Refresh Page").Hint("Refresh Page").Icon("fas fa-sync")
+                .OnClick("Index.btnRefresh_click").StylingMode(ButtonStylingMode.Outlined));
+
+            a.Add().Location(ToolbarItemLocation.After)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Auto)
+                .ShowText(ToolbarItemShowTextMode.InMenu)
+                .Widget(w => w.Button().ID("btnLogOut").Text("Log Out").Hint("Log Out").Icon("fas fa-power-off")
+                .OnClick("logoutDeneme").StylingMode(ButtonStylingMode.Outlined));
+
+            a.Add().Location(ToolbarItemLocation.After)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Auto)
+                .Template(new TemplateName("templateUserDropDown"));
+
+            a.Add().Location(ToolbarItemLocation.After)
+                .LocateInMenu(ToolbarItemLocateInMenuMode.Always)
+                .Widget(w => w.SelectBox().ID("sbLangTemplates").StylingMode(EditorStylingMode.Outlined)
+                .DataSource(langList)
+                .DisplayExpr("key")
+                .ValueExpr("value")
+                .Value(lang)
+                .Width(120)
+                .OnValueChanged("Index.onLanguageSelectValueChanged")
+                .FieldTemplate(new JS("Index.onLanguageSelectBoxFieldTemplate"))
+                .ItemTemplate(new JS("Index.onLanguageSelectBoxItemTemplate"))
+                .ShowClearButton(false).DeferRendering(true));
+            })
+    )
+    
+    <div id="divDetay" style="height:94.7vh">
+        @(Html.DevExtreme().Drawer().ID("drawer")
+            .Position(DrawerPosition.Left)
+            .RevealMode(DrawerRevealMode.Slide)
+            .OpenedStateMode(DrawerOpenedStateMode.Shrink)
+            .CloseOnOutsideClick(false)
+            .Opened(true).ActiveStateEnabled(true)
+            .HoverStateEnabled(true)
+            .Content(@<text>
+                <div id="tabMain">
+                    @Html.DevExtreme().TabPanel().Items(t =>
+                    {
+                        t.Add().Title("İş Emri")
+                            .Template(@"<text><iframe src='Ticket/Tickets' id='tabIframe' style='width: 100%; height:100%; border:none;'></iframe></text>")
+                            //.Template(@"<text><iframe src='Ticket/Tickets' id='tabIframe' style='width: 100%; height:100%; border:none;'></iframe></text>")
+                            .Option("key", "-1");
+                    }
+                    ).ID("tabMain").DeferRendering(false).ItemTitleTemplate(new JS("Index.titleTemplate")).RepaintChangesOnly(true).Height("100%")
+                </div>
+            </text>)
+            .Template(@<text>
+                <div id="clock"></div>
+                <div id="treeview">
+                    @Html.DevExtreme().TreeView().AnimationEnabled(true).SearchEnabled(true).SearchEditorOptions(o => o.ShowClearButton(true).Height(30)
+                    .Placeholder("Ara").StylingMode(EditorStylingMode.Underlined).Width("auto")).ElementAttr("color","white").ID("treeMenu").ActiveStateEnabled(true).FocusStateEnabled(false).Items(i =>
+                    {
+                        foreach (var y in userPages.Where(s => s.HierarchicalLevel == 0 && s.ParentId == null).OrderBy(s => s.HierarchicalOrder))
+                        {
+                            i.Add().Icon(y.MenuIcon).Text(" " + y.MenuText).Option("url", y.UrlPath).Expanded(y.ExpandOnStart).Items(a =>
+                            {
+                                foreach (var x in userPages.Where(s => s.HierarchicalLevel == 1 && s.ParentId == y.Id).OrderBy(s => s.HierarchicalOrder))
+                                {
+                                    a.Add().Icon(x.MenuIcon).Text(" " + x.MenuText).Option("url", x.UrlPath).Expanded(x.ExpandOnStart).Items(b =>
+                                    {
+                                        foreach (var z in userPages.Where(s => s.HierarchicalLevel == 2 && s.ParentId == x.Id).OrderBy(s => s.HierarchicalOrder))
+                                        {
+                                            b.Add().Icon(z.MenuIcon).Text(" " + z.MenuText).Option("url", z.UrlPath).Expanded(z.ExpandOnStart);
+                                        }
+                                    });
+                                }
+                            });
+                        };
+                    }).SelectionMode(NavSelectionMode.Single).OnItemClick("Index.onTreeViewItem_click").Width(250).Height("100%")
+                </div>
+            </text>))
+    </div>
+
+    @using (Html.DevExtreme().NamedTemplate("templateUserDropDown"))
+    {
+        @(Html.DevExtreme().DropDownButton()
+            .Hint("User Information")
+            .SplitButton(true)
+            .Text(userViewData.FirstName + " " +userViewData.LastName)
+            .KeyExpr("Id").DisplayExpr("Text")
+            //TODO: Change Icon based on last known status
+            .UseSelectMode(false)
+            .DataSource(new object[] {
+                new {
+                    Id = 1,
+                    Text = "Çevrimiçi",
+                    icon = (Url.Content("~/images/status/status-online.png"))
+                },
+                new {
+                    Id = 2,
+                    Text = "Meşgul",
+                    icon = (Url.Content("~/images/status/status-busy.png"))
+                },
+                new {
+                    Id = 3,
+                    Text = "Uzakta",
+                    icon = (Url.Content("~/images/status/status-away.png"))
+                },
+                new {
+                    Id = 4,
+                    Text = "Çevrimdışı",
+                    icon = (Url.Content("~/images/status/status-offline.png"))
+                },
+                new {
+                    Id = 5,
+                    Text = "Mesajlarım",
+                    icon = "email",
+                    badge = "5"
+                },
+                new {
+                    Id = 6,
+                    Text = "Ekibim",
+                    icon = "group"
+                },
+                new {
+                    Id = 7,
+                    Text = "Çıkış Yap",
+                    icon = "runner"
+                },
+            })
+            .OnButtonClick("Index.profileButton_click")
+            .OnItemClick("Index.profileItem_click")
+        )
+    }
+
+</body>
+
+<script type="text/javascript">
+    var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+    function logoutDeneme() {
+        var result = Base.showMessage("Sistemden çıkmak istediğinize emin misiniz ?", messageType.Confirm, "Çıkış yapmak üzeresiniz.!");
+        result.done(function (dialogResult) {
+            if (dialogResult == true) {
+                $.ajax({
+                    url: "Account/Login?handler=Logout",
+                    headers: ajaxHeader,
+                    contentType: false,
+                    processData: false,
+                    type: 'post',
+                    success: function (response) {
+                        Base.showToast("Çıkış başarılı.!", "success");
+                        window.location.href = "/Account/Login/?culture=tr";
+                    }
+                });
+            }
+        })
+    }
+    
+    //console.log($("#loadPanel").dxLoadPanel("instance"));
+    //$("#loadPanel").dxLoadPanel("show");
+
+</script>
+
+<style>
+    #toolbar {
+        background-color: rgba(191, 191, 191, .15);
+        padding: 5px 10px 10px;
+        box-shadow: 0 2px 5px 0 rgba(0,0,0,0.25);
+        height: 51px;
+    }
+
+    #divDetay {
+        padding-top: 7px;
+    }
+
+    #tabMain {
+        padding-left: 2px;
+        padding-right: 2px;
+        padding-bottom: 2px;
+    }
+
+    #headerLogo {
+        background-image: url('/images/KurumLogo.png');
+        background-repeat: no-repeat;
+        background-size: contain;
+        height: 43px;
+        width: 50px;
+    }
+
+    #customImg {
+        width: 40px;
+        height: 40px;
+        padding: 2px;
+        float: left;
+    }
+
+    #clock {
+        color: black;
+        text-align: center;
+        padding: 10px;
+    }
+
+    #treeMenu {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    #treeMenu, .dx-treeview-toggle-item-visibility {
+        color: #000000 !important;
+    }
+
+    .dx-drawer-panel-content {
+        background-color: gainsboro !important;
+    }
+
+    a {
+        cursor: pointer;
+        white-space: nowrap;
+        border-bottom: 1px dashed;
+        border-bottom-color: white;
+        text-decoration: none;
+    }
+
+    .currently-active-item {
+        font-weight: bold;
+        background-color: darkgray;
+    }
+
+    .dx-treeview-item:after {
+        display: block;
+        left: 0;
+        width: 0;
+        height: 2px;
+        background-color: darkgray;
+        content: "";
+        transition: width 0.2s;
+    }
+
+    .dx-treeview-item:hover {
+        color: black;
+    }
+
+        .dx-treeview-item:hover:after {
+            width: 100%;
+        }
+
+    /*  .dx-treelist-checkbox-size .dx-checkbox-icon {
+        height: 20px;
+        width: 20px;
+    }  */
+
+</style>

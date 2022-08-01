@@ -1,0 +1,439 @@
+﻿@page
+@*
+    @using DIAS.Domain.Models
+    @{
+        var webApiUrl = Configuration.GetValue<string>("WebApiUrl");
+     var type = new[] { "Entry Amount", "Storage Amount" };
+    }
+
+    <script src="~/js/pages/depo/depo2.js"></script>
+
+    <p class="content-block dx-card responsive-paddings">
+        Warehouse Product Operations Add / Edit / Delete / Update
+    </p>
+
+    <div class="content-block dx-card responsive-paddings">
+        <div class="frm-title">
+            <h3>Warehouse Product Operations</h3>
+        </div>
+
+        @(Html.DevExtreme().TabPanel()
+            .ID("tabpanel-container")
+            .SelectedIndex(0)
+            .Loop(false)
+            .AnimationEnabled(true)
+            .SwipeEnabled(false)
+            .Items(i => {
+                i.Add().Title("Ürün Giriş İşlemleri").Template(new TemplateName("ProductEntryTemplate"));
+                i.Add().Title("Ürün Çıkış İşlemleri").Template(new TemplateName("ProductOutTemplate"));
+            })
+            .OnSelectionChanged("Depo2.tabSelectionChanged")
+            .OnTitleClick("Depo2.tabTitleClick")
+        )
+
+        @using (Html.DevExtreme().NamedTemplate("ProductEntryTemplate"))
+        {
+            <div class="btn-group">
+
+                @(Html.DevExtreme().Button().Hint("New Record").Text("New")
+                .Icon("fas fa-plus-square")
+                .Type(ButtonType.Success)
+                .OnClick("Depo2.createProductEntry")
+                )
+                @(Html.DevExtreme().Button().Hint("Delete Record").Text("Delete")
+                .Icon("fas fa-trash-alt")
+                .Type(ButtonType.Danger)
+                .OnClick("Depo2.deleteProductEntry")
+                )
+
+            </div>
+
+            @(Html.DevExtreme().Form().ID("frmWarehouseProductOperations").ColCount(4).Items(items =>
+            {
+                items.AddSimple().Label(l => l.Text("Tarih")).DataField("StartDate")
+                    .Editor(e => e.DateBox().ID("dateStart").Type(DateBoxType.Date).Value(DateTime.Today).Max(DateTime.Today)
+                    .OnValueChanged("Depo2.dateStartValueChanged"));
+
+                items.AddSimple().Label(l => l.Text("Tarih")).DataField("EndDate")
+                    .Editor(e => e.DateBox().ID("dateEnd").Type(DateBoxType.Date).Value(DateTime.Today).Max(DateTime.Today)
+                    .OnValueChanged("Depo2.dateStartValueChanged")).ValidationRules(r => r
+                    .AddRequired().Message("Cannot be null!"));
+
+                items.AddSimple().Label(l => l.Text("Miktar")).DataField("StartValue")
+                    .Editor(e => e.NumberBox().ID("txtStartValue").Value(0).ShowClearButton(true).Min(0)
+                    .Format("#0.##")
+                    .OnValueChanged("Depo2.txtStartValueChanged"));
+
+                items.AddSimple().Label(l => l.Text("Miktar")).DataField("EndValue")
+                    .Editor(e => e.NumberBox().ID("txtEndValue").Value(0).ShowClearButton(true).Min(0)
+                    .Format("#0.##")
+                    .OnValueChanged("Depo2.txtStartValueChanged"));
+
+                items.AddSimple().ColSpan(2).Label(l => l.Text("Ürün")).DataField("ProductId")
+                    .Editor(e => e.Lookup().ID("lookUpProduct").SearchMode(DropDownSearchMode.Contains).DataSource(d => d.RemoteController()
+                    .LoadUrl(webApiUrl + "api/products/getproducts")
+                    .LoadMode(DataSourceLoadMode.Raw)
+                    .OnBeforeSend("Depo2.beforeSend")
+                    .Key("ProductId"))
+                    .DisplayExpr("ProductName")
+                    .ValueExpr("ProductId")
+                    .SearchExpr("ProductName", "ProductCode")
+                    .SearchEnabled(true)
+                    .Placeholder("")
+                    .MinSearchLength(3)
+                    .ShowClearButton(true)
+                    .ShowCancelButton(true)
+                    .ShowDataBeforeSearch(false)
+                )
+                .HelpText("Arama yapabilmek için minumum 3 karakter giriniz");
+
+                items.AddButton().ColSpan(2).ButtonOptions(a => a.Text("Find").Icon("fas fa-search").Type(ButtonType.Default)
+                    .OnClick("Depo2.onFindClick")).HorizontalAlignment(HorizontalAlignment.Right);
+            }))
+
+            @(Html.DevExtreme().DataGrid<WarehouseProductEntry>().ID("grid")
+            .DataSource(d => d.RemoteController().Key("WarehouseEntryId"))
+            .Editing(e => e.Mode(GridEditMode.Popup).RefreshMode(GridEditRefreshMode.Repaint))
+            .Paging(paging => paging.PageSize(5))
+            .Pager(pager => pager.ShowNavigationButtons(true).ShowInfo(true).ShowPageSizeSelector(true))
+            .Selection(s => s.Mode(SelectionMode.Single))
+            .Height("auto")
+            .OnSelectionChanged("Depo2.selectRow")
+            .OnContentReady("Depo2.selectFirstRow")
+            .Export(e => e.AllowExportSelectedData(true).Enabled(true))
+            .FilterRow(f => f.Visible(true))
+            .HeaderFilter(h => h.Visible(true))
+            .ColumnChooser(e => e.Enabled(true))
+            .LoadPanel(p => p.Enabled(true))
+            .Columns(columns => {
+
+                columns.AddFor(m => m.Id)
+                    .Caption("Warehouse Entry ID").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.WarehouseId).Lookup(l => l.DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/warehouses/getwarehouses").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw).Key("WarehouseId"))
+                    .ValueExpr("WarehouseId").DisplayExpr("WarehouseName")).Caption("Warehouse").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.ProductId).Lookup(l => l.DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/products/getproducts").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw).Key("ProductId"))
+                    .ValueExpr("ProductId").DisplayExpr("ProductName")).Caption("Product").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.ProductUnit).Lookup(l => l.DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/parameters/getparameters/3").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw).Key("ProductUnit"))
+                    .ValueExpr("ParameterId").DisplayExpr("ParameterName")).Caption("Product Unit").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.ProductEntryAmount)
+                    .Caption("Product Entry Amount").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.ProductStorageUnit).Lookup(l => l.DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/parameters/getparameters/3").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw).Key("ProductStorageUnit"))
+                    .ValueExpr("ParameterId").DisplayExpr("ParameterName")).Caption("Product Storage Unit").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.ProductStorageAmount)
+                    .Caption("Product Storage Amount").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.ProductEntryDate)
+                    .Caption("Entry Date").DataType(GridColumnDataType.Date).Format("dd/MM/yyyy")
+                    .Alignment(HorizontalAlignment.Center);
+                columns.Add().Caption("Details").Width(75).Type(GridCommandColumnType.Buttons).Buttons(btns =>
+                {
+                    btns.Add().Name("grdWarehouseDetails").Icon("fas fa-info-circle").OnClick("Depo2.gridDetailsOnClick").Hint("Entry Details");
+                });
+
+            })
+        )
+        }
+        @using (Html.DevExtreme().NamedTemplate("ProductOutTemplate"))
+        {
+            <div class="btn-group">
+
+                @(Html.DevExtreme().Button().Hint("New Record").Text("New")
+                .Icon("fas fa-plus-square")
+                .Type(ButtonType.Success)
+                .OnClick("Depo2.createProductOut")
+                )
+                @(Html.DevExtreme().Button().Hint("Delete Record").Text("Delete")
+                .Icon("fas fa-trash-alt")
+                .Type(ButtonType.Danger)
+                .OnClick("Depo2.deleteProductOut")
+                )
+
+            </div>
+
+            @(Html.DevExtreme().DataGrid<WarehouseProductOut>().ID("gridProductOut")
+            .DataSource(d => d.RemoteController().Key("WarehouseOutId"))
+            .Editing(e => e.Mode(GridEditMode.Popup).RefreshMode(GridEditRefreshMode.Repaint))
+            .Paging(paging => paging.PageSize(5))
+            .Pager(pager => pager.ShowNavigationButtons(true).ShowInfo(true).ShowPageSizeSelector(true))
+            .Selection(s => s.Mode(SelectionMode.Single))
+            .Height("auto")
+            .OnSelectionChanged("Depo2.selectRowOut")
+            .OnContentReady("Depo2.selectFirstRowOut")
+            .Export(e => e.AllowExportSelectedData(true).Enabled(true))
+            .FilterRow(f => f.Visible(true))
+            .HeaderFilter(h => h.Visible(true))
+            .ColumnChooser(e => e.Enabled(false))
+            .Columns(columns => {
+
+                columns.AddFor(m => m.Id)
+                    .Caption("Warehouse Out ID").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.WarehouseId).Lookup(l => l.DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/warehouses/getwarehouses").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw).Key("WarehouseId"))
+                    .ValueExpr("WarehouseId").DisplayExpr("WarehouseName")).Caption("Warehouse").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.ProductId).Lookup(l => l.DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/products/getproducts").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw).Key("ProductId"))
+                    .ValueExpr("ProductId").DisplayExpr("ProductName")).Caption("Product").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.RequestBuildingId).Lookup(l => l.DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/buildings/getbuildings").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw).Key("RequestBuildingId"))
+                    .ValueExpr("BuildingId").DisplayExpr("BuildingName")).Caption("Request Building").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.ProductOutAmount)
+                    .Caption("Product Out Amount").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.RequestDate)
+                    .Caption("Request Date").DataType(GridColumnDataType.Date).Format("dd/MM/yyyy")
+                    .Alignment(HorizontalAlignment.Center);
+                columns.Add().Caption("Details").Width(75).Type(GridCommandColumnType.Buttons).Buttons(btns =>
+                {
+                    btns.Add().Name("grdProductOutDetails").Icon("fas fa-info-circle").OnClick("Depo2.gridDetailsOutOnClick").Hint("Out Details");
+                });
+
+            })
+        )
+        }
+
+
+        @(Html.DevExtreme().Popup()
+            .ID("details-form-popup")
+            .Visible(false)
+            .MinWidth(200)
+            .MaxWidth(700)
+            .Height("auto")
+            .ShowTitle(false)
+            .ShowCloseButton(false)
+            .ContentTemplate(@<text>
+            <div id="edit">
+                <div class="edit-label" id="grid-details-label"></div>
+                @(Html.DevExtreme().Form<WarehouseProductEntry>()
+                        .ID("details-form")
+                        .ShowColonAfterLabel(false)
+                        .ShowValidationSummary(true)
+                        .LabelLocation(FormLabelLocation.Left)
+                        .ScreenByWidth("Depo2.screenByWidth")
+                        .Items(items => {
+                            items.AddGroup().ColCount(2)
+                                .Items(groupItems => {
+                                    groupItems.AddSimpleFor(m => m.Id)
+                                        .Label(l => l.Text("Warehouse Entry ID").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.TextBox().ReadOnly(true)
+                                        ).HelpText("Leave it Empty").ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.WarehouseId)
+                                        .Label(l => l.Text("Warehouse").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbWarehouse").DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/warehouses/getwarehouses").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw)
+                                        .Key("WarehouseId"))
+                                        .SearchEnabled(true).SearchExpr("WarehouseName","WarehouseCode")
+                                        .ValueExpr("WarehouseId").DisplayExpr("WarehouseName")
+                                        .ShowClearButton(true)
+                                    ).ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.ProductId)
+                                        .Label(l => l.Text("Product").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbProduct").DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/products/getproducts").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw)
+                                        .Key("ProductId"))
+                                        .DataSourceOptions(op => op.Paginate(true).PageSize(15))
+                                        .SearchEnabled(true).SearchExpr("ProductName","ProductCode")
+                                        .ValueExpr("ProductId").DisplayExpr("ProductName")
+                                        .ShowClearButton(true)
+                                    ).ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.ProductUnit)
+                                        .Label(l => l.Text("Unit").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbProductUnit").DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/parameters/getparameters/3").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw)
+                                        .Key("ProductUnit"))
+                                        .SearchEnabled(true).SearchExpr("ParameterName")
+                                        .ValueExpr("ParameterId").DisplayExpr("ParameterName")
+                                        .ShowClearButton(true)
+                                    );
+
+                                    groupItems.AddSimpleFor(m => m.ProductEntryAmount)
+                                        .Label(l => l.Text("Amount").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.NumberBox().Format("#0.##").ShowClearButton(true).Min(0)
+                                    );
+
+                                    groupItems.AddSimpleFor(m => m.ProductStorageUnit)
+                                        .Label(l => l.Text("Storage Unit").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbProductStorageUnit").DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/parameters/getparameters/3").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw)
+                                        .Key("ProductStorageUnit"))
+                                        .SearchEnabled(true).SearchExpr("ParameterName")
+                                        .ValueExpr("ParameterId").DisplayExpr("ParameterName")
+                                        .ShowClearButton(true)
+                                    );
+
+                                    groupItems.AddSimpleFor(m => m.ProductStorageAmount)
+                                        .Label(l => l.Text("Storage Amount").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.NumberBox().Format("#0.##").ShowClearButton(true).Min(0)
+                                    );
+
+                                    groupItems.AddSimpleFor(m => m.StaffId)
+                                        .Label(l => l.Text("Staff").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbPersonel").DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/staffs/getstaffs").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw)
+                                        .Key("StaffId"))
+                                        .SearchEnabled(true).SearchExpr("FirstName", "LastName")
+                                        .ValueExpr("StaffId").DisplayExpr(new JS("displayExprCustomTemplate"))
+                                        .ShowClearButton(true)
+                                    ).ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.ProductEntryDate)
+                                        .Label(l => l.Text("Date").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.DateBox().DisplayFormat("dd/MM/yyyy").Max(DateTime.Now).ShowClearButton(true)
+                                    );
+
+                                });
+                        })
+                )
+                <div class="btn-group">
+                    @(Html.DevExtreme().Button()
+                            .Text("Save")
+                            .Type(ButtonType.Default)
+                            .Icon("fas fa-save")
+                            .OnClick("Depo2.saveWarehouse")
+                            .UseSubmitBehavior(true)
+                    )
+                    @(Html.DevExtreme().Button()
+                            .Text("Cancel")
+                            .Icon("fas fa-window-close")
+                            .OnClick("Depo2.hideDetailsPopup")
+                    )
+                </div>
+            </div>
+            </text>)
+        )
+        @(Html.DevExtreme().Popup()
+            .ID("detailsout-form-popup")
+            .Visible(false)
+            .Width(750)
+            .Height("auto")
+            .ShowTitle(false)
+            .ShowCloseButton(false)
+            .ContentTemplate(@<text>
+            <div id="edit">
+                <div class="edit-label" id="grid-detailsout-label"></div>
+                @(Html.DevExtreme().Form<WarehouseProductOut>()
+                        .ID("detailsout-form")
+                        .ShowColonAfterLabel(false)
+                        .ShowValidationSummary(true)
+                        .LabelLocation(FormLabelLocation.Left)
+                        .Items(items => {
+                            items.AddGroup().ColCount(2)
+                                .Items(groupItems => {
+                                    groupItems.AddSimpleFor(m => m.Id)
+                                        .Label(l => l.Text("Warehouse Out ID").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.TextBox().ReadOnly(true)
+                                        ).HelpText("Leave it Empty").ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.WarehouseId)
+                                        .Label(l => l.Text("Warehouse").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbWarehouse").DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/warehouses/getwarehouses").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw)
+                                        .Key("WarehouseId"))
+                                        .OnValueChanged("Depo2.sbWarehouseValueChanged")
+                                        .SearchEnabled(true).SearchExpr("WarehouseName","WarehouseCode")
+                                        .ValueExpr("WarehouseId").DisplayExpr("WarehouseName")
+                                        .ShowClearButton(true)
+                                    ).ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.ProductId)
+                                        .Label(l => l.Text("Product").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbProduct")
+                                        .SearchEnabled(true).SearchExpr("ProductName")
+                                        .ValueExpr("ProductId").DisplayExpr("ProductName")
+                                    ).ColSpan(2);
+
+                                    groupItems.AddSimple().Label(l => l.Text("Product Out Type").Alignment(HorizontalAlignment.Left)).Editor(e => e.RadioGroup().ID("rbType").Items(type).OnValueChanged("Depo2.radioGroup_valueChanged")).ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.ProductOutAmount)
+                                        .Label(l => l.Text("Amount").Alignment(HorizontalAlignment.Right))
+                                        .Editor(e => e.NumberBox().Format("#0.##").ShowClearButton(true).Min(0)
+                                    );
+
+                                    groupItems.AddEmpty();
+
+                                    groupItems.AddSimpleFor(m => m.RequestBuildingId)
+                                        .Label(l => l.Text("Building").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbRequestBuilding").DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/buildings/getbuildings").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw)
+                                        .Key("RequestBuildingId"))
+                                        .SearchEnabled(true).SearchExpr("BuildingName","BuildingCode")
+                                        .ValueExpr("BuildingId").DisplayExpr("BuildingName")
+                                        .ShowClearButton(true)
+                                    ).ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.RequestStaffId)
+                                        .Label(l => l.Text("Staff").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.SelectBox().ID("sbStaff").DataSource(d => d.RemoteController().LoadUrl(webApiUrl + "api/staffs/getstaffs").OnBeforeSend("Depo2.beforeSend").LoadMode(DataSourceLoadMode.Raw)
+                                        .Key("StaffId"))
+                                        .SearchEnabled(true).SearchExpr("FirstName", "LastName")
+                                        .ValueExpr("StaffId").DisplayExpr(new JS("displayExprCustomTemplate"))
+                                        .ShowClearButton(true)
+                                    ).ColSpan(2);
+
+                                    groupItems.AddSimpleFor(m => m.RequestDate)
+                                        .Label(l => l.Text("Date").Alignment(HorizontalAlignment.Left))
+                                        .Editor(e => e.DateBox().DisplayFormat("dd/MM/yyyy").Max(DateTime.Now).ShowClearButton(true)
+                                    );
+
+                                });
+                        })
+                )
+                <div class="btn-group">
+                    @(Html.DevExtreme().Button()
+                            .Text("Save")
+                            .Type(ButtonType.Default)
+                            .Icon("fas fa-save")
+                            .OnClick("Depo2.saveProductOut")
+                    )
+                    @(Html.DevExtreme().Button()
+                            .Text("Cancel")
+                            .Icon("fas fa-window-close")
+                            .OnClick("Depo2.hideDetailsPopup")
+                    )
+                </div>
+            </div>
+            </text>)
+        )
+    </div>
+
+    <script>
+        function displayExprCustomTemplate(item) {
+            if (!item) {
+                return "";
+            }
+            return item.FirstName + " " + item.LastName;
+        }
+    </script>
+    <style>
+
+        #frmWarehouseProductOperations {
+            padding: 20px;
+        }
+
+        .frm-grid {
+            padding: 20px;
+        }
+
+        .frm-title h3 {
+            font-family: 'Segoe UI Light', 'Helvetica Neue Light', 'Segoe UI', 'Helvetica Neue', 'Trebuchet MS', Verdana;
+            font-weight: 300;
+            font-size: 28px;
+            text-align: center;
+            margin-bottom: 10px;
+            margin-top: 10px;
+        }
+
+        .frm-title-detail h3 {
+            font-family: 'Segoe UI Light', 'Helvetica Neue Light', 'Segoe UI', 'Helvetica Neue', 'Trebuchet MS', Verdana;
+            font-weight: 300;
+            font-size: 22px;
+            text-align: left;
+            padding-left: 20px;
+        }
+
+        .btn-group {
+            display: block;
+            text-align: right;
+            margin-right: 0px;
+            margin-top: 10px;
+        }
+
+        .dx-overlay-modal .edit-label {
+            width: 100%;
+            margin-bottom: 30px;
+            font-size: 16px;
+            color: black;
+            font-weight: bold;
+        }
+    </style>*@
+
