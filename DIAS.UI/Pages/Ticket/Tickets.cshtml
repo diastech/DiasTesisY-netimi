@@ -1,0 +1,3001 @@
+﻿@page
+@using Newtonsoft.Json;
+@using static DiasShared.Enums.Standart.TicketEnums
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Custom
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Standard
+@using DIAS_UI.Helpers; 
+@model DIAS.UI.Pages.Ticket.CustomTicketDto
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+
+@{
+
+    //List<CustomLocationDto> emp = (List<CustomLocationDto>)ViewData["Locations"];
+
+    var user = SessionHelper.GetObjectFromJson(HttpContext.Session, "user");
+    var convertedUser = JsonConvert.DeserializeObject<UserDto>(user);
+    var userViewData = convertedUser;
+
+    var locationsViewData = (List<CustomLocationDto>)ViewData["Locations"];    
+}
+
+<script src="https://unpkg.com/devextreme-aspnet-data/js/dx.aspnet.data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/7.10.1/polyfill.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/3.8.0/exceljs.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" defer></script>
+<script src="sweetalert2.all.min.js"></script>
+<script src="sweetalert2.min.js"></script>
+<link rel="stylesheet" href="sweetalert2.min.css">
+<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="~/js/pages/ticket/tickets.js"></script>
+<script src="~/js/pages/shared/reason.js"></script>
+<script src="~/js/pages/shared/location.js"></script>
+
+@*<link rel="stylesheet" type="text/css" href="css/dx.common.css" />
+    <link rel="stylesheet" type="text/css" href="css/dx.light.css" />
+    <link rel="stylesheet" type="text/css" href="index.css" />
+    <script type="text/javascript" src="js/jquery-2.2.3.min.js"></script>
+    <script type="text/javascript" src="js/dx.web.js"></script>
+    <script type="text/javascript" src="index.js"></script>*@
+
+
+<div class="card">
+    <div class="card-header" role="tab" id="accord1">
+        <h5 class="mb-0">
+            <a data-toggle="collapse" href="#collapse-pane-1" role="button" aria-expanded="true" aria-controls="collapse-pane-1">
+                <i style="margin-right:5px" class="fa fa-filter" aria-hidden="true"></i>Filtre
+            </a>
+        </h5>
+    </div>
+
+    <div id="collapse-pane-1" class="collapse " role="tabpanel" aria-labelledby="accord1">
+        <div class="card-body">
+            @(Html.DevExtreme().Form().ID("#frmTicket").ColCount(12).ShowColonAfterLabel(false).Items(items =>
+            {
+            items.AddSimple().ColSpan(4).Label(l => l.Text("Vaka"))
+                .Template(@<text> @await Html.PartialAsync("../Shared/Filter/_FilterReasonTemplate")</text>);
+
+        items.AddSimple().ColSpan(4).Label(l => l.Text("İş Emri Durumu"))
+        .Template(@<text> @await Html.PartialAsync("../Shared/Filter/_FilterTicketStateTemplate")</text>);
+
+                        items.AddSimple().ColSpan(4).Label(l => l.Text("Mahal"))
+                
+                .Template(@<text> @await Html.PartialAsync("../Shared/Filter/_FilterLocationTemplate")</text>);
+
+            items.AddSimple().ColSpan(4).Label(l => l.Text("Öncelik"))
+                            .Editor(e => e.SelectBox()
+                .ID("sbPriorityFilter")
+                .DeferRendering(false)
+                .DataSource(d => d.RemoteController()
+                .Key("Id")
+                .LoadUrl(Url.Page(null, "TicketPriorityData"))
+                )
+                .OnOpened("onOpenedPriorityFilter")
+                .ValueExpr("Id")
+                .DisplayExpr("Name")
+                .ShowClearButton(true));
+                
+
+                        items.AddSimple().ColSpan(4).Label(l => l.Text("Sorumlu Kişi"))
+                .Template(@<text> @await Html.PartialAsync("../Shared/Filter/_FilterUserTemplate")</text>);
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Açıklama")).Editor(e => e.TextBox().ID("textDescription").ShowClearButton(true));
+                items.AddSimple().ColSpan(4).Label(l => l.Text("İş Emri Numarası")).Editor(e => e.TextBox().ID("ticketCode").ShowClearButton(true));
+                
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Bildirim Tarihi Başlangıç"))
+                .Editor(e => e.DateBox().ID("filterDateTicketStart").OnValueChanged("onValueChangefilterDateTicketStartStart")
+            .ShowClearButton(true)
+            .Type(DateBoxType.DateTime)
+            .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+            .Placeholder("Tarih seçiniz."));
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Bildirim Tarihi Bitiş"))
+                .Editor(e => e.DateBox().ID("filterDateTicketEnd").OnValueChanged("onValueChangefilterDateTicketStartEnd")
+            .ShowClearButton(true)
+            .Type(DateBoxType.DateTime)
+            .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+            .Placeholder("Tarih seçiniz."));
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Kayıt Altına Alan Kişi")).Editor(e => e.SelectBox()
+    .ID("sbTicketUserFilterTicketOwner")
+    .DataSource(d => d.RemoteController()
+    .Key("Id")
+    .LoadUrl(Url.Page(null, "UserData"))
+    ).DataSourceOptions(o => o.Paginate(true).PageSize(20))
+    .DeferRendering(true)
+    .ValueExpr("Id")
+    .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+    .ShowClearButton(true)
+    .SearchEnabled(true)
+    .SearchExpr("FirstName", "LastName", "UserName", "Email"));
+
+                //items.AddSimple().ColSpan(4).Label(l => l.Text("Müdahale Süresi")).Editor(e => e.TextBox().ID("filterResponseTime").ShowClearButton(true));
+
+                //items.AddSimple().ColSpan(4).Label(l => l.Text("Çözüm Süresi")).Editor(e => e.TextBox().ID("filterResoluitonTime").ShowClearButton(true));
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Hedeflenen Müdahale Zamanı Başlangıç"))
+                .Editor(e => e.DateBox().ID("filterResponseTimeTargetedStart").OnValueChanged("onChangeFilterResponseTimeTargetedStart")
+            .ShowClearButton(true)
+            .Type(DateBoxType.Date)
+            .DisplayFormat("dd/MM/yyyy")
+            .Placeholder("Hedeflenen Müdahale Zamanı seçiniz."));
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Hedeflenen Müdahale Zamanı Bitiş"))
+                .Editor(e => e.DateBox().ID("filterResponseTimeTargetedEnd").OnValueChanged("onChangeFilterResponseTimeTargetedEnd")
+            .ShowClearButton(true)
+            .Type(DateBoxType.Date)
+            .DisplayFormat("dd/MM/yyyy")
+            .Placeholder("Hedeflenen Müdahale Zamanı seçiniz."));
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Bildiren Kişi")).Editor(e => e.TextBox().ID("filterDeclarativeUser").ShowClearButton(true));
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Hedeflenen Çözüm Zamanı Başlangıç"))
+                .Editor(e => e.DateBox().ID("filterResoluitonTimeTargetedStart").OnValueChanged("onChangeFilterResoluitonTimeTargetedStart")
+            .ShowClearButton(true)
+            .Type(DateBoxType.Date)
+            .DisplayFormat("dd/MM/yyyy")
+            .Placeholder("Hedeflenen Çözüm Zamanı seçiniz."));
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Hedeflenen Çözüm Zamanı Bitiş"))
+                .Editor(e => e.DateBox().ID("filterResoluitonTimeTargetedEnd").OnValueChanged("onChangeFilterResoluitonTimeTargetedEnd")
+            .ShowClearButton(true)
+            .Type(DateBoxType.Date)
+            .DisplayFormat("dd/MM/yyyy")
+            .Placeholder("Hedeflenen Çözüm Zamanı seçiniz."));
+
+
+                
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Telefon")).Editor(e => e.TextBox().ID("txtPhoneFilter")
+                                .Mask("(X00) 000-0000")
+                                .MaskRules(new { X = new JS("/[02-9]/") }));
+
+                
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Atama Grubu"))
+                            .Editor(e => e.SelectBox()
+                .ID("sbAssignedGroupFilter")
+                .DeferRendering(false)
+                .ShowClearButton(true));
+
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Müdahale Edilme Zamanı"))
+                .Editor(e => e.DateBox().ID("filterResponsedTime")
+            .ShowClearButton(true)
+            .Type(DateBoxType.DateTime)
+            .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+            .Placeholder("Müdahale Edilme Zamanı seçiniz."));
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Çözüm Zamanı"))
+                .Editor(e => e.DateBox().ID("filterResoluitonedTime")
+            .ShowClearButton(true)
+            .Type(DateBoxType.DateTime)
+            .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+            .Placeholder("Çözüm Zamanı seçiniz."));
+
+                items.AddSimple().ColSpan(4).Label(l => l.Text("Kapatılma Tarihi"))
+                .Editor(e => e.DateBox().ID("filterClosedTime")
+            .ShowClearButton(true)
+            .Type(DateBoxType.DateTime)
+            .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+            .Placeholder("Kapatılma Tarihi seçiniz."));
+
+                items.AddEmpty().ColSpan(8);
+                items.AddEmpty().ColSpan(10);
+
+                items.AddButton().ColSpan(1)
+                .ButtonOptions(a => a.Text("Ara")
+                .ID("ticketSearch")
+                .Icon("fas fa-search")
+                .Type(ButtonType.Default)
+                .OnClick("btn_ticketFindClick")
+                .UseSubmitBehavior(true)
+                .Hint("Kayıtları Filtrele"))
+                                    .HorizontalAlignment(HorizontalAlignment.Right);
+
+                items.AddButton().ColSpan(1)
+                .ButtonOptions(a => a.Text("Temizle")
+                .ID("ticketClean")
+                .Type(ButtonType.Default)
+                .OnContentReady("onContentReadyButtonClean")
+                .Icon("fas fa-broom")
+                //.ElementAttr(new JS("{ style: 'background-color: yellow;' }"))
+                .Type(ButtonType.Default)
+                .OnClick("clearAll")
+                .UseSubmitBehavior(true)
+
+                .Hint("Filtre Temizle"))
+                .HorizontalAlignment(HorizontalAlignment.Right);
+            }))
+        </div>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header" role="tab" id="accord2">
+        <h5 class="mb-0">
+            <a class="collapsed" data-toggle="collapse" href="#collapse-pane-2" role="button" aria-expanded="false" aria-controls="collapse-pane-2">
+                <i style="margin-right:5px" class="fas fa-ticket-alt"></i>Liste
+            </a>
+        </h5>
+    </div>
+    <div id="collapse-pane-2" class="collapse show" role="tabpanel" aria-labelledby="accord2">
+        <div class="card-body">
+
+
+
+            @(Html.DevExtreme().DataGrid<CustomTicketDto>()
+                                                        .ID("gridTicket")
+                                                        .ErrorRowEnabled(false)
+                                                        .DataSource(ds => ds.RemoteController()
+                                                        .OnBeforeSend("beforeSend")
+                                                        .Key("Id")
+                                                        .LoadUrl(Url.Page(null, "GridData"))
+                                                        .InsertUrl(Url.Page(null, "GridRow"))
+                                                        .UpdateUrl(Url.Page(null, "GridRowUpdate"))
+                                                    //.DeleteUrl(Url.Page(null, "GridRowDelete"))
+                                                    )
+                                                        //.FilterBuilder(o=>o.CustomOperations(co=>co.Add().))
+                                                        .Export(o=>o.Enabled(true).AllowExportSelectedData(true))
+                                                        .OnExporting("ticketGridDataExporting")
+                                                        .ShowColumnHeaders(true)
+                                                        .AllowColumnReordering(true)
+                                                        .HeaderFilter(o=>o.AllowSearch(true))
+                                                        .FilterRow(o => o.Visible(true).ShowOperationChooser(true))
+                                                        .Selection(s => s.Mode(SelectionMode.Single))
+                                                        .OnSelectionChanged("onSelectionChanged")
+                                                        .OnInitialized("OnInitialized")
+                                                        .OnToolbarPreparing("onToolbarPreparing")
+                                                        .OnCellPrepared("OnCellPrepared")
+                                                        .OnContentReady("onContentReadyGrid")
+                                                    .RemoteOperations(true)
+                                                    .ColumnChooser(c => c.Enabled(true).AllowSearch(true).Mode(GridColumnChooserMode.Select).Title("Sütün Ekleme/Kaldırma"))
+                                                        .ShowBorders(true)
+                                                        .Paging(p => p.Enabled(false))
+                                                    .Editing(e => e.Mode(GridEditMode.Popup)
+                                                            .AllowUpdating(true)
+                                                            .UseIcons(true)
+                                                            .EditColumnName("İşlemler")
+                                                            .AllowAdding(true)
+                                                            .SelectTextOnEditStart(true)
+                                                            .StartEditAction(GridStartEditAction.DblClick)
+                                                            .Popup(p => p
+                                                                .Title("İş Emri Ekle")
+                                                                .ID("popupContainer")
+                                                                .ShowTitle(true)
+                                                                .MaxWidth("1000px")
+                                                                .MinWidth("960px")
+                                                                .Height("98%")
+                                                                .OnShowing("setPopupTitle")
+                                                                .ShowCloseButton(false)
+                                                                .Position(PositionAlignment.Center)
+
+                                                            )
+                                                        .Form(f => f.Items(items =>
+                                                        {
+                                                            items.AddGroup()
+                                                                .Items(groupItems =>
+                                                                {
+                                                                    groupItems.AddTabbed()
+                    .TabPanelOptions(o =>
+                    {
+                        o.DeferRendering(false);
+                        o.AnimationEnabled(true);
+                        o.ID("ticketTab");
+                        o.Width(900);
+                        o.OnInitialized("tabs_Initialized");
+                        o.AnimationEnabled(true);
+                        o.ShowNavButtons(true);
+                        o.Height("100%");
+                        o.OnItemRendered("Tickets.tabTicketItemRendered");
+                    })
+                    .Tabs(tabItems =>
+                    {
+                        tabItems.Add().Icon("fas fa-save").AlignItemLabels(true)
+                    .Title("İş Emri Bilgileri").ColCount(2)
+                    .Items(tabItem =>
+                    {
+                    tabItem.AddSimpleFor(m => m.TicketReasonId).ColSpan(1)
+    .Label(l => l.Text("Vaka").Visible(true))
+    .Editor(e=>e.DropDownBox()
+.ID("dropDownReasonSingle")
+.DataSource(d => d.RemoteController().LoadUrl(Url.Page(null, "TicketReasonData")).Key("HierarchyId"))
+.DeferRendering(true)
+.ValueExpr("HierarchyId")
+.DisplayExpr("CategoryName")
+.DropDownOptions(o => o.Height(350).Width(402))
+.Placeholder("Vaka Nedeni Seçiniz")
+.ShowClearButton(true)
+.OnValueChanged("treeBox_valueChangedReason")
+.ContentTemplate(
+        @<text>
+            @await Html.PartialAsync("../Shared/_ReasonTreeViewSingle")
+        </text>
+                ))
+                            .ValidationRules(v =>
+                            {
+                                v.AddRequired().Message("Vaka Boş Geçilemez");
+                            });
+                tabItem.AddButton().ColSpan(1).ButtonOptions(bo => bo.Text("Mahal Ekle").Icon("box").Width("54%").Height("32px").OnClick("onclickMahalPopup").ID("addMahalButton").Template(@<text>
+            <div>Mahal Ekle<span class='badge badge-info'></span></div>
+            </text>));
+
+                tabItem.AddSimpleFor(m => m.TicketDescription).ColSpan(2)
+    .Label(l => l.Text("Açıklama").Visible(true)).Editor(e => e.TextArea().ID("textAreaDescription")
+    .Placeholder("Açıklama giriniz...").Height(100))
+            .ValidationRules(v =>
+            {
+                v.AddRequired().Message("Açıklama Alanı Boş Geçilemez");
+            });
+                tabItem.AddSimpleFor(m => m.TicketOpenedTime).ColSpan(1)
+                    .Label(l => l.Text("Bildirim Zamanı").Visible(true)).Editor(e => e.DateBox().ID("dateTicket")
+                    .ShowClearButton(true)
+                    .OnValueChanged("onValueChangeOpenedTime")
+                    .Type(DateBoxType.DateTime)
+                    .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+                    .Placeholder("Tarih seçiniz."))
+                    .ValidationRules(v =>
+                    {
+                        v.AddRequired().Message("Tarih boş geçilemez.");
+                    });
+
+                tabItem.AddSimpleFor(m => m.TicketPriorityGridId).ColSpan(1).Label(l => l.Text("Öncelik").Visible(true))
+                                    .Editor(e => e.SelectBox()
+                            .ID("sbTicketPriority")
+                                    .DataSource(d => d.RemoteController()
+                                    .Key("Id")
+                                    .LoadUrl(Url.Page(null, "TicketPriorityData")))
+                                    .DisplayExpr("Name")
+                                    .ShowClearButton(true)
+                                    .DeferRendering(false)
+                                    .SearchEnabled(true)
+                                    .OnOpened("onOpenedPriority")
+                                    .Placeholder("Öncelik seçiniz.")
+                                    .ValueExpr("Id"))
+                                            .ValidationRules(v =>
+                                            {
+                                                v.AddRequired().Message("Öncelik Boş Geçilemez");
+                                            });
+                tabItem.AddSimple().Template(@<text><hr /></text>).ColSpan(2);
+
+                tabItem.AddSimpleFor(m => m.TickedAssignedAssignmentGroupId)
+                    .Label(l => l.Text("Sorumlu Grup/Kişi").Visible(true))
+                    .Editor(e => e.SelectBox()
+                    .ID("sbAsgGroup")
+                    .DataSource(d => d.RemoteController().CacheRawData(false)
+                    .Key("id")
+                    .LoadUrl(Url.Page(null, "TicketAssignmentGroupData"))
+                    .LoadMode(DataSourceLoadMode.Raw))
+                    .DeferRendering(false)
+                    .ValueExpr("Id")
+                    .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+                    .ShowClearButton(true)
+                    .SearchEnabled(true)
+                    .Placeholder("Sorumlu grup seçiniz.")
+                    .SearchExpr("FirstName", "LastName", "UserName", "Email"));
+
+
+
+                tabItem.AddSimpleFor(m => m.TicketAssignedUserId)
+                    .Label(l => l.Text("Sorumlu Kişi").Visible(true))
+                    .Editor(e => e.SelectBox()
+                    .ID("sbAsgGroupEmp")
+                    .DataSource(d => d.RemoteController()
+                    .Key("Id")
+                    .LoadUrl(Url.Page(null, "UserData")))
+                    .DataSourceOptions(o => o.Paginate(true).PageSize(20))
+                    .DeferRendering(true)
+                    .ValueExpr("Id")
+                    .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+                    .ShowClearButton(true)
+                    .SearchEnabled(true)
+                    .Placeholder("Sorumlu kişi seçiniz.")
+                    .SearchExpr("FirstName", "LastName", "UserName", "Email"))
+                    .ValidationRules(v =>
+                    {
+                        v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                    });
+
+
+
+                tabItem.AddSimple().Template(@<text><hr /><label style="font-weight: bold;">Bildiren</label></text>).ColSpan(1);
+                tabItem.AddSimple().Template(@<text><hr /><label style="font-weight: bold;">Kayıt Altına Alan</label></text>).ColSpan(1);
+                    tabItem.AddSimple().ColSpan(1).Label(l => l.Text("Ad/Soyad")).Editor(e => e.TextBox().ID("DeclarativeUser").ShowClearButton(true));
+
+
+                    tabItem.AddSimpleFor(m => m.TicketReportedUserId).ColSpan(1)
+                                    .Label(l => l.Text("Ad/Soyad    ").Visible(true))
+                                    .Editor(e => e.SelectBox()
+                            .ID("ticketUserId")
+                            .DataSource(d => d.RemoteController()
+                            .Key("Id")
+                            .LoadUrl(Url.Page(null, "UserData")))
+                            .DataSourceOptions(o => o.Paginate(true).PageSize(20))
+                            .DeferRendering(true)
+                            .ValueExpr("Id").Value(userViewData.Id)
+                            .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+                            .ShowClearButton(true)
+                            .ReadOnly(true)
+                            .SearchEnabled(true)
+                            .Placeholder("Bildiren kişi seçiniz.")
+                            .SearchExpr("FirstName", "LastName", "UserName", "Email"))
+                        //.ValidationStatus(ValidationStatus.Invalid))
+                        .ValidationRules(v =>
+                        {
+                            v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                        });
+
+
+
+
+                    //tabItem.AddSimpleFor(m => m.TicketRelatedLocations).ColSpan(2).Label(l => l.Text("Mahal").Visible(true))
+                    //        .ValidationRules(v =>
+                    //        {
+                    //            v.AddRequired().Message("Mahal Bilgisi Boş Geçilemez");
+                    //        });
+
+
+                    tabItem.AddSimpleFor(m => m.PhoneNumber).ColSpan(1).Label(l=>l.Text("Telefon Numarası")).Editor(e => e.TextBox().ID("txtPhone")
+                    .Mask("(X00) 000-0000")
+                    .MaskRules(new { X = new JS("/[02-9]/") }));
+
+                    tabItem.AddSimpleFor(m => m.PhoneNumberKayitAltinaAlan).ColSpan(1).Label(l => l.Text("Telefon Numarası")).Editor(e => e.TextBox().ID("txtPhoneKayitAltinaAlan")
+                              .Mask("(X00) 000-0000")
+                              .MaskRules(new { X = new JS("/[02-9]/") }));
+
+
+
+
+                    tabItem.AddSimple().Template(@<text><hr /><label style="font-weight: bold;">Müdehale Zamanları</label></text>).ColSpan(1);
+                    tabItem.AddSimple().Template(@<text><hr /><label style="font-weight: bold;">Çözüm Zamanları</label></text>).ColSpan(1);
+
+                tabItem.AddSimple().ColSpan(1).Label(l => l.Text("Müdehale edilme Zamanı").Visible(true)).Editor(e => e.DateBox().ID("dateResponseTimeSolvedStarted")
+                .ShowClearButton(true)
+                            .Disabled(true)
+                .Type(DateBoxType.DateTime)
+                        .Value("2021-12-27 09:00:56.127")
+                .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+                .ReadOnly(true));
+
+                tabItem.AddSimple().ColSpan(1).Label(l => l.Text("Çözüm edilme Zamanı").Visible(true)).Editor(e => e.DateBox().ID("dateResolutionTimeSolved")
+                    .ShowClearButton(true)
+                    .Type(DateBoxType.DateTime)
+                        .Value("2021-12-27 08:00:10.250")
+                    .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+                                .Disabled(true)
+                    .ReadOnly(true));
+                tabItem.AddSimple().ColSpan(1).Label(l => l.Text("Müdehale Süresi").Visible(true)).Editor(e => e.TextBox().ID("dateResponseTimeText")
+                    .Disabled(true)
+                    .ReadOnly(true));
+                tabItem.AddSimple().ColSpan(1).Label(l => l.Text("Çözüm Süresi").Visible(true)).Editor(e => e.TextBox().ID("dateResolutionTimeText")
+            .Disabled(true)
+            .ReadOnly(true));
+                tabItem.AddSimple().ColSpan(1).Label(l => l.Text("Hedeflenen Müdehale Zamanı").Visible(true)).Editor(e => e.DateBox().ID("dateResponseTime")
+    .ShowClearButton(true)
+                .Disabled(true)
+    .Type(DateBoxType.DateTime)
+    .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+    .ReadOnly(true));
+                tabItem.AddSimple().ColSpan(1).Label(l => l.Text("Hedeflenen Çözüm Zamanı").Visible(true)).Editor(e => e.DateBox().ID("dateResolutionTime")
+            .ShowClearButton(true)
+            .Type(DateBoxType.DateTime)
+            .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+                        .Disabled(true)
+            .ReadOnly(true));
+
+
+
+
+
+                    });
+
+                        tabItems.Add()
+                    .Title("Notlar")
+                .Icon("far fa-file-alt").Disabled(true)
+                    .Template(new TemplateName("tabTicketNotesTemplate"));
+
+                        tabItems.Add()
+                    .Title("Dosyalar")
+                .Icon("fas fa-paperclip")
+                    .Template(new TemplateName("tabTicketAttachmentsGridTemplate"));
+
+                        tabItems.Add()
+            .Title("Sorular")
+            .Template(@<text>
+                </text>);
+                                tabItems.Add()
+                .Title("Tarihçe")
+                .Template(@<text>
+                </text>);
+                });
+                                                            });
+
+
+                                                        }).ID("ticketForm")))
+        .Columns(columns =>
+         {
+
+             columns.Add()
+                .Caption("")
+                .AllowSearch(false)
+                .AllowSorting(false)
+                .Alignment(HorizontalAlignment.Center)
+                .CellTemplate(new JS("cellTemplate_CurrentStatus"))
+                .Width(41);
+             columns.Add().Width(50).Caption("Uyarı").Visible(true).CellTemplate(@<text>
+            <i class="fas fa-clock"></i>
+            </text>);
+         columns.AddFor(m => m.TicketReason.ReasonName).Caption("Vaka").AllowEditing(true);
+         columns.AddFor(m => m.AddedByUser.FirstName).Caption("Ekleyen Kullanıcı Ad").AllowEditing(true);
+         columns.AddFor(m => m.AddedByUser.LastName).Caption("Ekleyen Kullanıcı Soyad").AllowEditing(true);
+         columns.AddFor(m => m.TicketOpenedTime).Caption("Bildirim Tarihi").DataType(GridColumnDataType.DateTime).Format("dd/MM/yyyy HH:mm").Alignment(HorizontalAlignment.Center).Width(180);
+         columns.AddFor(m => m.ExpectedResponseTime).Caption("Hedeflenen Müdahale Zamanı").DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center).CellTemplate(new JS("EditCellTemplateExpectedResponseTime")).Width(180);
+         columns.AddFor(m => m.ExpectedResolutionTime).Caption("Hedeflenen Çözüm Zamanı").DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center).CellTemplate(new JS("EditCellTemplateExpectedResolutionTime")).Width(180);
+
+         //columns.Add().CalculateCellValue("calculateCellValueOne").Caption("İş Emri Tarihi").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         //columns.Add().CalculateCellValue("calculateCellValueTwo").Caption("Vaka Numarası").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         //columns.Add().CalculateCellValue("calculateCellValueThree").Caption("Müdahale Süresi").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         //columns.Add().CalculateCellValue("calculateCellValueFour").Caption("Çözüm Süresi").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         //columns.Add().CalculateCellValue("calculateCellValueFive").Caption("Hedeflenen Müdahale Süresi").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         //columns.Add().CalculateCellValue("calculateCellValueSix").Caption("Telefon Numarası").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         //columns.Add().CalculateCellValue("calculateCellValueSeven").Caption("Kayıt Altına Alan Kişi").AllowEditing(true);
+         //columns.Add().CalculateCellValue("calculateCellValueEight").Caption("Müdahale Edilme Zamanı").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         //columns.Add().CalculateCellValue("calculateCellValueNine").Caption("Çözüm Zamanı").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         //columns.Add().CalculateCellValue("calculateCellValueTen").Caption("Kapatılma Zamanı").AllowEditing(true).DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+         columns.AddFor(y => y.TicketPriorityGridId).Caption("Öncelik").AllowEditing(true).Visible(false)
+        .Lookup(l => l.DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+            .ValueExpr("Value")
+            .DisplayExpr("Text"));
+         columns.AddFor(y => y.TickedAssignedAssignmentGroup.GroupName).Caption("Sorumlu Grup").AllowEditing(true).Visible(false);
+         columns.AddFor(m => m.TicketStatus.Name).Caption("İş Emri Durumu");
+         columns.Add().Visible(false)
+               .Caption("Kalan Süre")
+               .AllowSearch(false)
+               .AllowFiltering(false)
+               .AllowGrouping(false)
+               .AllowHeaderFiltering(false)
+               .AllowHiding(false)
+               .AllowReordering(false)
+               .AllowResizing(false)
+               .Alignment(HorizontalAlignment.Left)
+               .CellTemplate(new JS("cellTemplate_TimeRemaining"))
+               .Width(140);
+
+         columns.Add().Caption("İşlemler").Width(150).CssClass("diasClass").CellTemplate(@<text>
+                @(Html.DevExtreme().DropDownButton()
+                        .ElementAttr(new JS("{ style: 'background-color: #337ab7;' }"))
+                        .Text("Seçenekler")
+                        .DeferRendering(true)
+                        .Icon("fas fa-ellipsis-v")
+                        .DataSource(d => d.RemoteController()
+                        .Key("Id")
+                        .LoadUrl(Url.Page(null, "TicketStateDataOption"))
+                        .LoadParams(new { ticketId = new JS("data.Id") }))
+                        .DropDownOptions(options => options.Width(250))
+                        .DisplayExpr("StateDescription")
+                        .KeyExpr("Id")
+                        .OnItemClick("btn_ticketStateOnClick")
+                        .ItemTemplate(new JS("btnStateTemplate"))
+                                    )
+                </text>);
+
+        })
+        //.OnRowPrepared("Tickets.grd_onRowPrepared")//önceliğine göre grid renklerini ayarlama
+        .OnEditingStart(@<text> function(e) {onEditingStart(e) } </text>)
+        .OnInitNewRow(@<text> function(e) { OnInitNewRow(e); } </text>)
+
+
+        @*.MasterDetail(md => md
+        .Enabled(true)
+        .Template(@<text>
+            @(Html.DevExtreme().DataGrid<CustomTicketDto>()
+            .ColumnAutoWidth(true)
+            .ShowBorders(true)
+            .RemoteOperations(true)
+            .Columns(column =>
+            {
+                column.Add().DataField("TicketRelatedLocations").CellTemplate(new JS("TicketRelatedLocationsFunc")).Caption("Lokasyon");
+                column.AddFor(m => m.TicketReason.ReasonName).Caption("Vaka");
+                column.AddFor(m => m.TickedAssignedAssignmentGroup.GroupName).Caption("Sorumlu Gurup");
+
+            })
+            .DataSource(d => d.RemoteController()
+            .Key("Id")
+            .LoadUrl(Url.Page(null, "TicketDataById"))
+            .LoadParams(new { ticketId = new JS("data.Id") })
+            )
+
+            )
+
+        </text>)
+    )*@
+
+    .MasterDetail(md => md
+        .Enabled(true)
+        .Template(@<text>
+    <div class="container-fluid col-md-12" style="padding-left: 0px;padding-right: 0px;">
+        <div class="row content">
+            <br>
+
+            <div class="col-md-12" >
+                <div class="row" style="border: 1px solid; padding: 10px; border-radius: 5px; border-color: black; margin-bottom: 10px;">
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Vaka Açıklaması</h4>
+                            <p><%- data.TicketReason.ReasonName %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>İş Emri Açıklaması</h4>
+                            <p><%- data.TicketDescription %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Bildirim Zamanı</h4>
+                            @*<p><%- data.OpenedTime %></p>*@
+                            <p>2017-02-14</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Öncelik</h4>
+                            <p><%- data.TicketPriority.Name %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Notlar</h4>
+                            <p><%- data.NotesCount %> Adet Not Vardır</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Dosyalar</h4>
+                            <p><%- data.AttachemntsCount %> Adet Dosya vardır</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>İş Emri Kodu</h4>
+                            <p><%- data.TicketCode %></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="row" style="border: 1px solid; padding: 10px; border-radius: 5px; border-color: black; margin-bottom: 10px;">
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Müdahele Edilme Zamanı</h4>
+                            <p>2017-02-14</p>
+                            @*<p><%- data.OpenedTime %></p>*@
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Müdahale Süresi</h4>
+                            <p><%- data.TicketReason.ResolutionTime %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="well">
+                            <h4>Hedeflenen Müdahale Zamanı</h4>
+                            <p><%- data.DateTimeResponseTimeString %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Çözüm Edilme Zamanı</h4>
+                            <p>2017-02-14</p>
+                            @*<p><%- data.OpenedTime %></p>*@
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="well">
+                            <h4>Çözüm Süresi</h4>
+                            <p><%- data.TicketReason.ResponseTime %></p>
+                            <p><%- data.OpenedTime %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="well">
+                            <h4>Hedeflenen Çözüm Zamanı</h4>
+                            <p><%- data.DateTimeResolutionTimeString %></p>
+                            @*<p><%- data.OpenedTime %></p>*@
+                        </div>
+                    </div>
+
+                    </div>
+
+                <div class="row" style="border: 1px solid; padding: 10px; border-radius: 5px; border-color: black; margin-bottom: 10px;">
+                    <div class="col-md-6">
+                        <div class="well">
+                            <h4>Mahaller</h4>
+                            <p><%- data.RelatedLocationsCount %></p>
+                            @*<button id="goLocation<%- data.Id %>">Detaya Git</button>*@
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="well">
+                            <h4>Bildiren Kişi</h4>
+                            <p><%- data.FirstLastName %></p>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="row" style="border: 1px solid; padding: 10px; border-radius: 5px; border-color: black; margin-bottom: 10px;">
+                    <div class="col-md-6">
+                        <div class="well">
+                            <h4>Kayıt Altına Alan Kişi</h4>
+                            <p><%- data.FirstLastName %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="well">
+                            <h4>Telefon Numarası</h4>
+                            <p>5352642349</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="row" style="border: 1px solid;padding: 10px;border-radius: 5px;border-color: black;">
+                    <div class="col-md-6">
+                        <div class="well">
+                            <h4>Sorumlu Grup</h4>
+                            <p><%- data.FirstLastName %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="well">
+                            <h4>Sorumlu Kişi</h4>
+                            <p>5352642349</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+            </text>)
+    )
+    )
+        </div>
+    </div>
+</div>
+
+
+
+@using (Html.DevExtreme().NamedTemplate("tabTicketNotesTemplate"))
+{
+    <div>
+        @(Html.DevExtreme().TextArea().ID("textTicketNote").Placeholder("Notunuzu giriniz...").Height(150))
+
+    </div>
+    <div id="fileuploader-container">
+        @(Html.DevExtreme().FileUploader()
+            .ID("file-uploader")
+            .Name("myFile")
+            .Multiple(true)
+            .Accept("*")
+            .UploadMode(FileUploadMode.UseForm)
+            //.ShowFileList(true)
+            .OnValueChanged("noteFileUploader_valueChanged")
+     )
+    </div>
+    <div>
+
+
+
+
+    </div>
+    <div>
+        @(Html.DevExtreme().Button().Text("Ekle").OnClick("noteKaydet").Icon("save").Type(ButtonType.Success).ID("noteButton"))
+    </div>
+    <div id="AddedNoteFile">
+
+    </div>
+    <div class="content" id="selected-files">
+        <div>
+            <h4>Seçilen Dosyalar</h4>
+        </div>
+    </div>
+    <div>
+        @(Html.DevExtreme().DataGrid<CustomTicketNoteDto>()
+            .ID("ticketNotesGrid")
+            .LoadPanel(panel => panel.Enabled(true))
+            .RenderAsync(true)
+            .DataSource(ds => ds.RemoteController()
+            .OnBeforeSend("beforeSendTicketNote")
+            .Key("Id")
+            .LoadUrl(Url.Page(null, "TicketNote"))
+            .OnLoaded("onLoadedNoteGrid")
+            .LoadParams(new { ticketId = new JS("noteLoadParams(data)") })
+            )
+            .RemoteOperations(true)
+            .ShowColumnLines(false)
+            .ShowRowLines(true)
+            .Paging(paging => paging.Enabled(true).PageSize(6))
+            .Columns(columns => {
+                columns.AddFor(m => m.AddedByUser.FirstName).Caption("Ekleyen Kullanıcı Ad").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.AddedByUser.LastName).Caption("Ekleyen Kullanıcı Soyad").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m => m.NoteText).Caption("Not").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(m=>m.AddedTime).Caption("Ekleme Tarihi").DataType(GridColumnDataType.Date).Format("dd/MM/yyyy").Alignment(HorizontalAlignment.Center);
+                columns.Add().Caption("Ekler").DataField("Attachments").Alignment(HorizontalAlignment.Left).CellTemplate(new JS("TicketNoteGridCellTemplate"));
+            })
+        )
+    </div>
+}
+
+
+@using (Html.DevExtreme().NamedTemplate("tabTicketAttachmentsGridTemplate"))
+{
+    <div id="fileuploader-container">
+        @(Html.DevExtreme().FileUploader()
+            .ID("attachment-uploader")
+            .Name("myFile")
+            .Multiple(true)
+            .Accept("*")
+            .UploadMode(FileUploadMode.UseForm)
+            .ShowFileList(true)
+            .OnValueChanged("attachmentUploader_valueChanged")
+     )
+    </div>
+    <div id="attachmentButtonDiv">
+        @(Html.DevExtreme().Button().Text("Ekle").Visible(false).OnClick("attachmentKaydet").Icon("save").Type(ButtonType.Success).ID("attachmentButton"))
+    </div>
+
+    <div>
+        @(Html.DevExtreme().DataGrid<AttachmentDto>().ID("ticketAttachmentGrid")
+            .LoadPanel(panel => panel.Enabled(true))
+            .ShowColumnLines(false)
+            .ShowRowLines(true)
+            .RenderAsync(true)
+            .DataSource(ds => ds.RemoteController()
+            .OnBeforeSend("beforeSendTicketAttachment")
+            .Key("Id")
+            .LoadUrl(Url.Page(null, "TicketAttachment"))
+            .OnLoaded("onLoadedAttachmentGrid")
+            .LoadParams(new { ticketId = new JS("attachmentLoadParams(data)")}))
+            .Paging(paging => paging.Enabled(true).PageSize(6))
+            .RemoteOperations(true)
+            .Columns(columns => {
+
+                columns.AddFor(x => x.Id).Visible(false).Alignment(HorizontalAlignment.Left);
+                columns.AddFor(x => x.AddedByUser.FirstName).Visible(true).Caption("Ekleyen Kullanıcı Ad").Alignment(HorizontalAlignment.Left);
+                columns.AddFor(x => x.AddedByUser.LastName).Visible(true).Caption("Ekleyen Kullanıcı Soyad").Alignment(HorizontalAlignment.Left);
+                //columns.AddFor(x => x.FolderName).Visible(false).Alignment(HorizontalAlignment.Left);
+                columns.AddFor(x => x.AttachmentDescription).Caption("Açıklama").Visible(true).Alignment(HorizontalAlignment.Left);
+                columns.Add().Caption("Dosya Eki").DataField("Attachments").Alignment(HorizontalAlignment.Left).CellTemplate(new JS("ticketAttachmentGridCellTemplate"));
+            })
+        )
+    </div>
+}
+
+
+@(Html.DevExtreme().Popup()
+    .ID("popupContainerMahal")
+    .Visible(false)
+    .Width("50%")
+    .Height("70%")
+    .ShowTitle(false)
+    .ShowCloseButton(true)
+)
+@(Html.DevExtreme().Popup()
+    .ID("popupAssignedUser")
+    .Visible(false)
+    .Width("50%")
+    .Height("70%")
+    .ShowTitle(false)
+    .ShowCloseButton(true)
+)
+
+@using (Html.DevExtreme().NamedTemplate("reasonTreeViewSingle2"))
+{
+    @(Html.DevExtreme().TreeView()
+        .ID("reasonTreeViewSingle2")
+        .DataSource(new JS(@"component.getDataSource()"))
+        .KeyExpr("HierarchyId")
+        .DisplayExpr("CategoryName")
+        .ParentIdExpr("ParentHierarchy")
+        .ExpandNodesRecursive(true)
+        .DataStructure(TreeViewDataStructure.Plain)
+        .SelectionMode(NavSelectionMode.Single)
+        .SelectNodesRecursive(false)
+        .SelectByClick(true)
+        .SearchEnabled(true)
+        .Height(300)
+        .OnItemClick(
+        @<text>
+            function(args) {
+                if(args.itemData.IsReason == false){
+                    return;
+                    }
+                    else{
+                    component.close();
+                    }
+            }
+        </text>
+        )
+        .OnItemSelectionChanged(
+        @<text>f
+            function(args) {
+                if(args.itemData.IsReason == false)
+                    return;
+                component.option("value", args.component.getSelectedNodeKeys());
+            }
+        </text>
+        )
+        .OnContentReady(
+        @<text>
+            function(args) {
+                syncTreeViewSelection(args.component, component.option("value"));
+            }
+        </text>
+        )
+)
+}
+@using (Html.DevExtreme().NamedTemplate("locationTreeViewMultiple2"))
+{
+    @(Html.DevExtreme().TreeView()
+    .ID("locationTreeViewMultiple2")
+    .DataSource(new JS(@"component.getDataSource()"))
+    .KeyExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .ParentIdExpr("ParentHierarchy")
+    .DataStructure(TreeViewDataStructure.Plain)
+    .SelectionMode(NavSelectionMode.Multiple)
+    .ShowCheckBoxesMode(TreeViewCheckBoxMode.Normal)
+    .SelectNodesRecursive(false)
+    .SelectByClick(true)
+    .Height(300)
+    .SearchEnabled(true)
+    .SearchEditorOptions(o => o.Placeholder("Mahal Ara"))
+    .SearchTimeout(500)
+    .OnItemClick(
+        @<text>
+            function(args) {
+                component.close();
+            }
+        </text>
+    )
+    .OnItemSelectionChanged(
+        @<text>
+            function(args) {
+                component.option("value", args.component.getSelectedNodeKeys());
+            }
+        </text>)
+    .OnContentReady(
+        @<text>
+            function(args) {
+                Location.syncTreeViewSelection(args.component, component.option("value"));
+            }
+        </text>)
+)
+}
+
+@using (Html.DevExtreme().NamedTemplate("LocationPopup"))
+{
+
+    @(Html.DevExtreme().DropDownBox()
+                    .ID("dropDownLocation")
+                    .DataSource(locationsViewData, "HierarchyId")
+                    //.DataSource(d => d.RemoteController()
+                    //.Key("HierarchyId")
+                    //.LoadUrl(Url.Page(null, "LocationData")))
+                    .DeferRendering(false)
+                    .Width("50%")
+                    .ValueExpr("HierarchyId")
+                    .DisplayExpr("LocationName")
+                    .DropDownOptions(o => o.Height(350))
+                    .Placeholder("Mahal Seçiniz Seçiniz..")
+                    .ShowClearButton(true)
+                    .OnValueChanged("locationTreeBox_valueChanged")
+                    .DropDownOptions(ddo=>ddo.ShowTitle(false))
+                    .ContentTemplate(
+                            @<text>
+                                @await Html.PartialAsync("../Shared/_LocationTreeViewMultiple")
+                            </text>
+                    ))
+    @(Html.DevExtreme().ScrollView().Width("100%").Height("100%").Content(@<text>
+<div id="selectedLocation" class="container">
+
+    </div></text>));
+
+}
+
+@using (Html.DevExtreme().NamedTemplate("AssignUserPopup"))
+{
+    @(Html.DevExtreme().SelectBox().ID("assignedUser")
+                            .DataSource(d => d.RemoteController()
+                            .Key("Id")
+                            .LoadUrl(Url.Page(null, "UserData")))
+                            .DataSourceOptions(o => o.Paginate(true).PageSize(20))
+                            .DeferRendering(true)
+                            .ValueExpr("Id")
+                            .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+                            .ShowClearButton(true)
+                            .SearchEnabled(true)
+                            .Placeholder("Bildiren kişi seçiniz.")
+                            .SearchExpr("FirstName", "LastName", "UserName", "Email"))
+
+}
+
+@using (Html.DevExtreme().NamedTemplate("noteFileShowTemplate"))
+{
+
+    <div id="list">
+    </div>
+
+}
+
+@(Html.DevExtreme().Popup()
+    .ID("popupNoteShow")
+    .Visible(false)
+    .Width("50%")
+    .Height("70%")
+    .ShowTitle(false)
+    .ShowCloseButton(true)
+)
+
+
+<script type="text/javascript">
+
+
+
+    function EditCellTemplateExpectedResolutionTime(container, options) {
+        let expectedResolutionTime = new Date(moment(options.data.ExpectedResolutionTime)).getTime();
+        let days;
+        //todo :   ticket state durumlarına göre tekrar bakılabilir
+        let timeRemainingExpectedResolutionTime = setInterval(function () {
+            let now = new Date().getTime();
+            var distance;
+            distance = expectedResolutionTime - now;
+            var day = Math.floor(distance/(1000 * 60 * 60 * 24));
+
+
+            if (day < 0) {
+                day = day * (-1);
+            }
+            days = Math.floor(day);
+
+            let d = "g";
+            let hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            let h = "sa";
+            let minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            let m = "dk";
+            let seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            let s = "sn";
+
+
+            if (options.data.TicketStatusId == 1) {
+                clearInterval(timeRemainingExpectedResolutionTime);
+                if (distance > 0)   {
+                    $(`#expectedResolutionTimeCount${options.data.Id}`).css("color", "green");
+                    $(`#expectedResolutionTimeCount${options.data.Id}`).css("font-weight", "bold");
+                    document.getElementById("expectedResolutionTimeCount" + options.data.Id).innerHTML = `Kalan ${days}${d} ${hours}${h} ${minutes}${m}`;
+
+                }
+                else {
+
+                    $(`#expectedResolutionTimeCount${options.data.Id}`).css("color", "red");
+                    $(`#expectedResolutionTimeCount${options.data.Id}`).css("font-weight", "bold");
+                    document.getElementById("expectedResolutionTimeCount" + options.data.Id).innerHTML = `Geçmiş -${days}${d} ${hours}${h} ${minutes}${m}`;
+
+                }
+            }
+            else {
+                //clearInterval(timeRemainingExpectedResolutionTime);
+                $(`#expectedResolutionTimeCount${options.data.Id}`).css("color", "black");
+                $(`#expectedResolutionTimeCount${options.data.Id}`).parent().css("background","#c9c9c9")
+                $(`#expectedResolutionTimeCount${options.data.Id}`).css("font-weight", "bold");
+                document.getElementById("expectedResolutionTimeCount" + options.data.Id).innerHTML = `${moment(options.data.ExpectedResolutionTime).format('DD/MM/YYYY HH:mm')}`;
+                clearInterval(timeRemainingExpectedResolutionTime);
+                return;
+            }
+
+        }, 1000);
+
+        $("<div id= 'expectedResolutionTimeCount" + options.data.Id + "''>")
+            .append()
+            .appendTo(container);
+    }
+
+    function EditCellTemplateExpectedResponseTime(container, options) {
+        let expectedResponseTime = new Date(moment(options.data.ExpectedResponseTime)).getTime();
+        //let openedTime = new Date(moment(options.data.openedTime)).getTime();
+        let now = new Date().getTime();
+        //todo :   ticket state durumlarına göre tekrar bakılabilir
+        let timeRemainingExpectedResponseTime = setInterval(function () {
+            let now = new Date().getTime();
+            let days;
+
+            var distance = expectedResponseTime - now;
+
+            var day = distance / (1000 * 60 * 60 * 24);
+            if (day < 0) {
+                day = day * (-1);
+            }
+
+
+                days = Math.floor(day);
+
+            let d = "g";
+            let hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            let h = "sa";
+            let minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            let m = "dk";
+            let seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            let s = "sn";
+
+            if (options.data.TicketStatusId == 1) {
+                if (distance > 0) {
+                    $(`#expectedResponseTimeCount${options.data.Id}`).css("color", "green");
+                    $(`#expectedResponseTimeCount${options.data.Id}`).css("font-weight", "bold");
+                    document.getElementById("expectedResponseTimeCount" + options.data.Id).innerHTML = `Kalan${days}${d} ${hours}${h} ${minutes}${m}`;
+                    clearInterval(timeRemaining);
+                }
+                else {
+
+                    $(`#expectedResponseTimeCount${options.data.Id}`).css("color", "red");
+                    $(`#expectedResponseTimeCount${options.data.Id}`).css("font-weight", "bold");
+                    document.getElementById("expectedResponseTimeCount" + options.data.Id).innerHTML = `Geçmiş - ${days}${d} ${hours}${h} ${minutes}${m}`;
+                    clearInterval(timeRemainingExpectedResponseTime);
+                }
+            }
+            else {
+                $(`#expectedResponseTimeCount${options.data.Id}`).css("color", "gray");
+                $(`#expectedResponseTimeCount${options.data.Id}`).css("font-weight", "bold");
+                document.getElementById("expectedResponseTimeCount" + options.data.Id).innerHTML = `${moment(options.data.ExpectedResponseTime).format('DD/MM/YYYY HH:mm')}`;
+                clearInterval(timeRemainingExpectedResponseTime);
+                return;
+            }
+
+
+
+
+        }, 1000);
+
+        $("<div id= 'expectedResponseTimeCount" + options.data.Id + "''>")
+            .append()
+            .appendTo(container);
+    }
+
+    function onLoadedNoteGrid(e) {
+        $("#ticketForm").dxForm("instance").option("items[0].items[0].tabs[1].badge", e.length.toString());
+    }
+
+    function onLoadedAttachmentGrid(e) {
+        $("#ticketForm").dxForm("instance").option("items[0].items[0].tabs[2].badge", e.length.toString());
+    }
+
+    function noteLoadParams(data) {
+        if (data == null) {
+            return 0;
+        }
+        else {
+            return data.Id;
+        }
+    }
+
+    function iconChange(e) {
+
+    }
+
+    function onLoadingOption(e) {
+
+    }
+
+    function attachmentLoadParams(data) {
+        if (data == null) {
+            return 0;
+        }
+        else {
+            return data.Id;
+        }
+    }
+
+    function attachmentKaydet(e) {
+        var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+
+        FormDataAttachmentFile.append("TicketId", data.Id);
+
+        $.ajax({
+            url: "Tickets?handler=AddAttachment",
+            headers: ajaxHeader,
+            data: FormDataAttachmentFile,
+            contentType: false,
+            processData: false,
+            type: 'post',
+            success: function () {
+                FormDataAttachmentFile.delete('attachmentFile');
+                $("#ticketAttachmentGrid").dxDataGrid("instance").refresh();
+                $("#attachment-uploader").dxFileUploader("instance").reset();
+            }
+        });
+    }
+
+
+    var data;
+    let attachmentFile;
+    let noteFile = [];
+    let locationsWithPopup = [];
+    let locationsUpdate = [];
+    let ticketStateId;
+    let ticketStatusId;
+    //row u editlemek istediğimizde
+    function onEditingStart(e) {
+        data = e.data;
+    }
+    //yeni bir row eklemek istediğimizde
+    function OnInitNewRow(e) {
+
+        data = null;
+    }
+
+    function calculateCellValueOne(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T","");
+        return day + '/' + month + '/' +"20"+year + " "+ a;
+
+    }
+
+    function calculateCellValueTwo(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+    function calculateCellValueThree(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+
+    function calculateCellValueFour(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+    function calculateCellValueFive(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+    function calculateCellValueSix(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+    function calculateCellValueSeven(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+    function calculateCellValueEight(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+    function calculateCellValueNine(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+    function calculateCellValueTen(e) {
+        var s = e.TicketOpenedTime.substring(0, e.TicketOpenedTime.indexOf('T'));
+        var datePart = s.match(/\d+/g),
+            year = datePart[0].substring(2),
+            month = datePart[1], day = datePart[2];
+        var a = e.TicketOpenedTime.substring(e.TicketOpenedTime.indexOf('T')).replace("T", "");
+        return day + '/' + month + '/' + "20" + year + " " + a;
+    }
+
+    function onToolbarPreparing(e) {
+        e.toolbarOptions.items[0].showText = "always";
+        e.toolbarOptions.items[0].options.text = "Yeni iş Emri ";
+        e.toolbarOptions.items[0].options.icon = "plus";
+        e.toolbarOptions.items[0].options.type = "success";
+    }
+
+    function OnAdaptiveDetailRowPreparing(e) {
+
+    }
+
+    function OnCellPrepared(e) {
+        if (e.column.type == "buttons") {
+            e.cellElement.children().removeClass('dx-icon-edit').addClass("dx-icon-search");
+            e.cellElement.children().attr("title","Detay");
+        }
+    }
+
+    function OnEditorPreparing(e) {
+
+    }
+
+    function OnRowPrepared(e) {
+    }
+
+    function onSelectionChanged(data) {
+        let rowData = data.selectedRowsData[0];
+        if (!rowData)
+            return;
+        dataRow = rowData;
+
+    }
+
+    //popup açıldığında
+    function setPopupTitle(e) {
+
+
+
+
+        if (data == null) {
+            $("#popupContainer").dxPopup("instance").option("height", "92%");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[0].toolbar", "top");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[0].options.icon", "save");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[0].options.type", "success");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].toolbar", "top");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].options.text", "Kapat");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].options.icon", "close");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].options.type", "default");
+            /*$("#popupContainer").dxPopup("instance").option("toolbarItems[1].options.elementAttr.class", "warning");*/
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].options.onClick", function onTicketPopupCloseClick(e)
+            {
+                if ($(".classTable").length != 0) {
+                    var tableCount = $(".classTable").length;
+                    var tableArray = [];
+                    tableArray = $(".classTable");
+                    for (var i = 0; i < tableCount; i++) {
+
+                        $("#dropDownLocation").dxDropDownBox("instance").option("value", null);
+                        $("#locationTreeViewMultiple").dxTreeView("instance").unselectAll();
+                        tableArray[i].remove();
+                    }
+                }
+                locationsWithPopup = [];
+                $("#popupContainer").dxPopup("hide");
+
+            });
+            $("#ticketForm").dxForm("instance").option("items[0].items[0].tabs[1].badge", null);
+            $("#ticketForm").dxForm("instance").option("items[0].items[0].tabs[2].badge", null);
+            $("#dateTicket").dxDateBox("instance").option("value", new Date());
+
+
+        }
+
+        $("#dateResponseTimeSolvedStarted").dxDateBox("instance")._$element.parent().parent().parent().parent().parent().parent().css("display", "none");
+        $("#dateResponseTimeText").dxTextBox("instance")._$element.parent().parent().parent().parent().css("border-right", "1px solid");
+        $("#dateResponseTime").dxDateBox("instance")._$element.parent().parent().parent().parent().css("border-right", "1px solid");
+
+        $("#sbAsgGroup").dxSelectBox("instance")._$element.parent().parent().parent().parent().css("border-right", "1px solid");
+        $("#DeclarativeUser").dxTextBox("instance")._$element.parent().parent().parent().parent().css("border-right", "1px solid");
+        $("#txtPhone").dxTextBox("instance")._$element.parent().parent().parent().parent().css("border-right", "1px solid");
+
+
+
+
+        if (data != null) {
+            //var sonuc="";
+            //for (var i = 0; i < (10 - data.Id.toString().length); i++) {
+            //    sonuc +="0";
+            //}
+            //var ticketCode = data.LocationNameGetByCodeId + data.TicketCode.toString();            
+            $("#popupContainer").dxPopup({
+                title: "İş Emri Detay" + "-" + `${data.TicketCode}`
+            });
+            $("#dateResponseTimeSolvedStarted").dxDateBox("instance").option("visible", false);
+
+            $("#dateResponseTimeSolvedStarted").dxDateBox("instance")._$element.parent().parent().parent().parent().parent().parent().css("display", "flex");
+            $("#dateResponseTimeSolvedStarted").dxDateBox("instance")._$element.parent().parent().parent().parent().css("border-right", "1px solid");
+            tabsData.option("items[1].disabled", false);
+            $("#ticketForm").dxForm("instance").option("items[0].items[0].tabs[1].badge", data.NotesCount.toString());
+            $("#ticketForm").dxForm("instance").option("items[0].items[0].tabs[2].badge", data.AttachemntsCount.toString());
+
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[0].toolbar", "top");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[0].options.icon", "save");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[0].options.type", "success");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[0].options.text", "Güncelle");
+
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].toolbar", "top");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].options.text", "Kapat");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].options.icon", "close");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[1].options.type", "default");
+
+            $("#attachmentButton").dxButton("instance").option("visible", true);
+
+            $("#dateResolutionTimeSolved").dxDateBox("instance").option("visible", true);
+            $("#dateResponseTimeSolvedStarted").dxDateBox("instance").option("visible", true);
+
+            if (data.TicketReason.ResolutionTime != null) {
+                var sonuc = data.TicketReason.ResolutionTime;
+                if (sonuc == 0) {
+                    $("#dateResolutionTimeText").dxTextBox("instance").option("value", "1 dk");
+                }
+                else {
+                    $("#dateResolutionTimeText").dxTextBox("instance").option("value", sonuc.toString() + "dk");
+                }
+
+            }
+
+            if (data.TicketReason.ResponseTime != null) {
+                var sonuc = data.TicketReason.ResponseTime;
+                if (sonuc == 0) {
+                    $("#dateResponseTimeText").dxTextBox("instance").option("value", "1 dk");
+                }
+
+                else {
+                    $("#dateResponseTimeText").dxTextBox("instance").option("value", sonuc.toString() + "dk");
+                }
+            }
+
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].widget", "dxDropDownButton");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].toolbar", "top");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.stylingMode", "text");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].location", "before");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.text", "Seçenekler");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.stylingMode", "text");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.type", "default");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.displayExpr", "Name");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.keyExpr", "Id");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.useSelectMode", "true");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.elementAttr.class", "dpbColor");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.elementAttr.id", "dpbId");
+
+
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[3].widget", "dxButton");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[3].toolbar", "top");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[3].location", "before");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.stylingMode", "text");
+            if (data.TicketStatus.Id == 1) {
+                $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.icon", `../../images/general/01_acik.svg`);
+            }
+            if (data.TicketStatus.Id == 2) {
+                $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.icon", `../../images/general/02_atandi.svg`);
+            }
+            if (data.TicketStatus.Id == 3) {
+                $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.icon", `../../images/general/03_calisiliyor.svg`);
+            }
+            if (data.TicketStatus.Id == 4) {
+                $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.icon", `../../images/general/04_beklet.svg`);
+            }
+            if (data.TicketStatus.Id == 5) {
+                $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.icon", `../../images/general/05_reddet.svg`);
+            }
+            if (data.TicketStatus.Id == 6) {
+                $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.icon", `../../images/general/06_cozumlendi.svg`);
+            }
+            if (data.TicketStatus.Id == 7) {
+                $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.icon", `../../images/general/07_kapali.svg`);
+            }
+
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.elementAttr.id", 'stateImgId');
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[3].options.disabled", "true");
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.onItemClick", function ticketStateOnClick(e) {
+
+                ticketStateId = e.itemData.Id;
+                ticketStatusId = data.TicketStatusId;
+
+                if (e.itemData.Id == 1 || e.itemData.Id == 2) {
+                    $("#popupAssignedUser").dxPopup("show");
+                    return;
+                }
+
+                var ajaxHeader = {};
+                        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+                $.ajax({
+                    type: "POST",
+                    url: "Tickets?handler=ChangeTicketState",
+                    headers: ajaxHeader,
+                    data: { "Id": ticketStateId, "ticketStateId": ticketStatusId, "userId": @userViewData.Id, "ticketId": data.Id },
+                    async: true,
+                    success: function (response) {
+                        $("#popupAssignedUser").dxPopup("hide");
+                        $("#popupContainer").dxPopup("hide");
+                        $("#gridTicket").dxDataGrid("instance").refresh();
+                        $("#assignedUser").dxSelectBox("instance").option("value", null);
+                    },
+                    failure: function (response) {
+                        alert(response);
+                    }
+                });
+
+                if (!data) return;
+            });
+
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.itemTemplate", function template(itemData) {
+
+                let sourceImg;
+                if (itemData.Id == 1)
+                    sourceImg = `../../images/general/kisiteata.svg`;
+                if (itemData.Id == 2)
+                    sourceImg = `../../images/general/grubaata.svg`;
+                if (itemData.Id == 3)
+                    sourceImg = `../../images/general/calismayabasla.svg`;
+                if (itemData.Id == 4)
+                    sourceImg = `../../images/general/cozumle.svg`;
+                if (itemData.Id == 5)
+                    sourceImg = `../../images/general/askiyaal.svg`;
+                if (itemData.Id == 6)
+                    sourceImg = `../../images/general/beklemeyeal.svg`;
+                if (itemData.Id == 7)
+                    sourceImg = `../../images/general/yenidenac.svg`;
+                if (itemData.Id == 8)
+                    sourceImg = `../../images/general/iptalet.svg`;
+                if (itemData.Id == 9)
+                    sourceImg = `../../images/general/reddet.svg`;
+                if (itemData.Id == 10)
+                    sourceImg = `../../images/general/kapat.svg`;
+
+                return `<div> <img style='float:left' src='${sourceImg}' /> <div style='float:left'>${itemData.Name}</div> </div>`;
+            });
+
+            var arr = getTicketState();
+
+            $("#popupContainer").dxPopup("instance").option("toolbarItems[2].options.items", arr);
+
+            var ticketReasonHierarchy = data.TicketReason.TicketReasonCategory.HierarchyId + `${data.TicketReasonId}/`;
+            $("#dropDownReasonSingle").dxDropDownBox("instance").option("value", ticketReasonHierarchy);
+            $("#sbTicketPriority").dxSelectBox("instance").option("value", null);
+            $("#sbTicketPriority").dxSelectBox("instance").option("value", data.TicketPriorityGridId);
+
+            let locations = [];
+
+            data.TicketRelatedLocations.forEach((location, index, array) => {
+                locations.push(location.TicketLocation.HierarchyId);
+                locationsWithPopup.push(location.TicketLocation);
+            });
+
+            $("#addMahalButton").dxButton("instance")._$element.children().children().children()[0].innerHTML = `${locations.length}`;
+
+            locationsUpdate = locations;
+
+            $("#ticketUserId").dxSelectBox("instance").option("value", String(data.AddedByUserId));
+
+            $("#sbAsgGroupEmp").dxSelectBox("instance").option("value", String(data.TicketAssignedUserId));
+            $("#dateTicket").dxDateBox("instance").option("value", data.TicketOpenedTime);
+            $("#dateResolutionTime").dxDateBox("instance").option("value", data.ExpectedResolutionTime);
+            $("#dateResponseTime").dxDateBox("instance").option("value", data.ExpectedResponseTime);
+            $("#dateResolutionTime").dxDateBox("instance").option("disabled", true);
+            $("#dateResponseTime").dxDateBox("instance").option("disabled", true);
+
+            $("#textAreaDescription").dxTextArea("instance").option("value", data.TicketDescription);
+            $("#stateImgId").parent().parent().css("position", "relative").css("right", "430px");
+            $("#dpbId").parent().parent().css("position", "relative").css("left", "315px");
+            $("#dpbId").find("span").css("color", "white")
+
+
+        }
+    }
+
+    function getTicketState() {
+        let arr = [];
+        var ajaxHeader = {};
+                        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+                        $.ajax({
+                            type: "GET",
+                            url: "Tickets?handler=TicketStateDataOption",
+                            headers: ajaxHeader,
+                            data: { "ticketId": data.Id },
+                            contentType: "application/json; charset=utf-8",
+                            dataType: "json",
+                            async: true,
+                            success: function (response) {
+                                if (response.data != null) {
+                                    for (var i = 0; i < response.data.length; i++) {
+                                        arr.push(response.data[i]);
+                                    }
+                                }
+                            },
+                            failure: function (response) {
+                                alert(response);
+                            }
+                        });
+        return arr;
+    }
+
+    function beforeSend(type, e) {
+        if (type == "load") return;
+        if (type == "update") {
+            var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+        var openedTime = $("#dateTicket").dxDateBox("instance").option("value");
+            var openedTimeConverted = (new Date(openedTime)).toUTCString(3);
+
+        var TicketDescription = $("#textAreaDescription").dxTextArea("instance").option("value");
+            console.log(TicketDescription);
+        var TicketAssignedUserId = $("#sbAsgGroupEmp").dxSelectBox("instance").option("value");
+            console.log(TicketAssignedUserId);
+        var TickedAssignedAssignmentGroupId = $("#sbAsgGroup").dxSelectBox("instance").option("value");
+            console.log(TickedAssignedAssignmentGroupId);
+        var TicketOwnerUserId = $("#ticketUserId").dxSelectBox("instance").option("value");
+            console.log(TicketOwnerUserId);
+        var TicketPriority = $("#sbTicketPriority").dxSelectBox("instance").option("value");
+            console.log(TicketPriority);
+        var TicketReasonId = $("#dropDownReasonSingle").dxDropDownBox("instance").option("value");
+            console.log(TicketReasonId);
+
+            var locations = [];
+
+            if ($("#locationTreeViewMultiple").dxTreeView("getSelectedNodes") == null) {
+                locations = locationsUpdate;
+            }
+            else {
+                for (var i = 0; i < $("#locationTreeViewMultiple").dxTreeView("getSelectedNodes").length; i++) {
+                    locations.push($("#locationTreeViewMultiple").dxTreeView("getSelectedNodes")[i].key);
+                }
+            }
+
+            var ticketNoteText = $("#textTicketNote").dxTextArea("instance").option("value");
+            console.log(ticketNoteText);
+            var dateResolutionTime = $("#dateResolutionTime").dxDateBox("instance").option("value");
+            console.log(dateResolutionTime);
+            var dateResolutionTimeConverted = (new Date(dateResolutionTime)).toUTCString(3);
+            console.log(dateResolutionTimeConverted);
+            var dateResponseTime = $("#dateResponseTime").dxDateBox("instance").option("value");
+            console.log(dateResponseTime);
+            var dateResponseTimeConverted = (new Date(dateResponseTime)).toUTCString(3);
+            console.log(dateResponseTimeConverted);
+
+        var formData = new FormData();
+            formData.append("Id", data.Id);
+            formData.append("AddedTime", data.AddedTime);
+            formData.append("TicketStatusId", data.TicketStatusId);
+            formData.append("IsDeleted", data.IsDeleted);
+            formData.append("IsActive", data.IsActive);
+        formData.append("TicketDescription", TicketDescription);
+        formData.append("TicketOpenedTime", openedTimeConverted);
+        formData.append("TicketAssignedUserId", TicketAssignedUserId);
+            formData.append("TickedAssignedAssignmentGroupId", 7);
+            formData.append("ExpectedResolutionTime", dateResolutionTimeConverted);
+            formData.append("ExpectedResponseTime", dateResponseTimeConverted);
+
+            formData.append("TicketReportedUserId", TicketOwnerUserId);
+        formData.append("TicketPriorityId", TicketPriority);
+        formData.append("TicketReasonHierarchyId", TicketReasonId);
+
+            if (attachmentFile != null) {
+                formData.append("AttachmentsFile", attachmentFile[0]);
+            }
+            if (noteFile != null) {
+                formData.append("NotesFile", noteFile[0]);
+            }
+
+
+
+            formData.append("TicketRelatedLocationHierarchyId", locations);
+        formData.append("NoteText", ticketNoteText);
+            /*formData.append("TicketOwnerUserId", "1");*/
+            formData.append("TicketOwnerUserId", TicketOwnerUserId);
+        formData.append("AddedByUserId", 1);
+        e.data = formData;
+        e.contentType = false;
+        e.processData = false;
+        e.headers = ajaxHeader;
+        }
+
+        if (type == "insert") {
+            var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+        var openedTime = $("#dateTicket").dxDateBox("instance").option("value");
+        var openedTimeConverted = (new Date(openedTime)).toUTCString(3);
+            var TicketDescription = $("#textAreaDescription").dxTextArea("instance").option("value");
+            //var DeclarativeUser = $("#DeclarativeUser").dxSelectBox("instance").option("value");
+            var TicketAssignedUserId = $("#sbAsgGroupEmp").dxSelectBox("instance").option("value");
+            console.log(TicketAssignedUserId);
+        var TickedAssignedAssignmentGroupId = $("#sbAsgGroup").dxSelectBox("instance").option("value");
+        var TicketOwnerUserId = $("#ticketUserId").dxSelectBox("instance").option("value");
+        var TicketPriority = $("#sbTicketPriority").dxSelectBox("instance").option("value");
+        var TicketReasonId = $("#dropDownReasonSingle").dxDropDownBox("instance").option("value");
+        var TicketRelatedLocations = $("#dropDownLocation").dxDropDownBox("instance").option("value");
+        var ticketNoteText = $("#textTicketNote").dxTextArea("instance").option("value");
+        var dateResolutionTime = $("#dateResolutionTime").dxDateBox("instance").option("value");
+        var dateResolutionTimeConverted = (new Date(dateResolutionTime)).toUTCString(3);
+        var dateResponseTime = $("#dateResponseTime").dxDateBox("instance").option("value");
+        var dateResponseTimeConverted = (new Date(dateResponseTime)).toUTCString(3);
+        var formData = new FormData();
+        formData.append("TicketDescription", TicketDescription);
+        formData.append("TicketOpenedTime", openedTimeConverted);
+        formData.append("TicketAssignedUserId", TicketAssignedUserId);
+        formData.append("TickedAssignedAssignmentGroupId", 7);
+        formData.append("ExpectedResolutionTime", dateResolutionTimeConverted);
+        formData.append("ExpectedResponseTime", dateResponseTimeConverted);
+        formData.append("TicketReportedUserId", TicketOwnerUserId);
+
+        //todo : Bu değer diasproject_identity den alınacak
+        //formData.append("TicketReportedUserId", 1);
+        formData.append("TicketPriorityId", TicketPriority);
+        formData.append("TicketReasonHierarchyId", TicketReasonId);
+            /*formData.append("AttachmentsFile", attachmentFile[0]);*/
+            if (attachmentFile != null) {
+
+                for (var i = 0; i < attachmentFile.length; i++) {
+                    formData.append("AttachmentsFile", attachmentFile[i]);
+                }
+
+            }
+            //todo : Dosya ekleme vakaya göre zorunlu veya zorunlu olmayacak
+            //else {
+            //    Swal.fire('Dosya Eklemediniz');
+            //    return;
+            //}
+            if (noteFile != null) {
+                formData.append("NotesFile", noteFile[0]);
+            }
+
+        formData.append("TicketRelatedLocationHierarchyId", TicketRelatedLocations);
+        /*formData.append("NoteText", ticketNoteText);*/
+            formData.append("TicketOwnerUserId", TicketOwnerUserId);
+        /*formData.append("AddedByUserId", 1);*/
+
+        e.data = formData;
+        e.contentType = false;
+        e.processData = false;
+        e.headers = ajaxHeader;
+        }
+
+
+
+    }
+    function beforeSendTicketNote(type,e) {
+
+    }
+    function beforeSendTicketAttachment(type,e) {
+
+    }
+
+    var FormDataNoteFile = new FormData();
+    var FormDataAttachmentFile = new FormData();
+
+    function attachmentUploader_valueChanged(e) {
+        let files = e.value;
+        attachmentFile = e.value;
+        formDataFiles = new FormData();
+        for (let i = 0; i != files.length; i++) {
+            formDataFiles.append("attachmentFile", files[i]);
+            FormDataAttachmentFile = formDataFiles;
+        }
+    }
+    var countNote = 1;
+    function noteFileUploader_valueChanged(e) {
+        let files = e.value;
+        noteFile.push(e.value);
+        formDataFiles = new FormData();
+        for (let i = 0; i != files.length; i++)
+        {
+            formDataFiles.append("noteFile", files[i]);
+            FormDataNoteFile = formDataFiles;
+        }
+
+
+//            $("#AddedNoteFile").append(`
+//<table id="tableNote${countNote}" class="table table-bordered classNoteTable">
+//  <thead>
+//  </thead>
+//  <tbody>
+//    <tr>
+//      <th class="col-md-2" scope="row">${countNote}</th>
+//      <th class="col-md-2">${textValue}</th>
+//      <td class="col-md-5">${textFileName}</td >
+//      <td class="col-md-5">
+//<button style="display: block;margin: auto;" type="button" id="noteFile${countNote}" name="noteFile${countNote}" class="btn btn-primary" onclick="onDeleteNoteFile(this)">Kaldır</button></td>
+//    </tr
+//  </tbody>
+//</table>`)
+//        countNote++;
+    }
+
+
+
+    function syncTreeViewSelection(treeView, value) {
+        if (!value) {
+            count = 0;
+            treeView.unselectAll();
+
+            if ($(".classTable").length != 0) {
+                var tableCount = $(".classTable").length;
+                var tableArray = [];
+                tableArray = $(".classTable");
+                for (var i = 0; i < tableCount; i++) {
+                    tableArray[i].remove();
+                }
+
+            }
+        } else {
+            var filterValue = treeView._dataSource._items;
+            for (var i = 0; i < filterValue.length; i++)
+            {
+                if (filterValue[i].HierarchyId == value) {
+                    var dateTicketTime = $("#dateTicket").dxDateBox("instance").option("value");
+                    console.log(dateTicketTime);
+                    var openedTimeConverted = (new Date(dateTicketTime)).toUTCString(3);
+
+                    if (dateTicketTime == null) {
+                        $("#dateResponseTime").dxDateBox("instance").option("value", moment(dateTicketTime).add(filterValue[i].ResponseTime, 'm').toDate());
+                        $("#dateResolutionTime").dxDateBox("instance").option("value", moment(dateTicketTime).add(filterValue[i].ResponseTime + filterValue[i].ResolutionTime, 'm').toDate());
+                    }
+                    else {
+                        $("#dateResponseTime").dxDateBox("instance").option("value", moment(dateTicketTime).add(filterValue[i].ResponseTime, 'm').toDate());
+                        $("#dateResolutionTime").dxDateBox("instance").option("value", moment(dateTicketTime).add(filterValue[i].ResponseTime + filterValue[i].ResolutionTime, 'm').toDate());
+                    }
+                    //$("#dateResolutionTimeText").dxTextBox("instance").option("value", filterValue[i].ResolutionTimeText);
+
+                    if (filterValue[i].LocationName == null) {
+                        if (filterValue[i].ResponseTimeText == "0") {
+                            $("#dateResolutionTimeText").dxTextBox("instance").option("value", "1 dk");
+                        }
+                        else {
+                            $("#dateResolutionTimeText").dxTextBox("instance").option("value", filterValue[i].ResolutionTimeText + "dk");
+                        }
+
+                        if (filterValue[i].ResponseTimeText == "0") {
+                            $("#dateResponseTimeText").dxTextBox("instance").option("value", "1 dk");
+                        }
+                        else {
+                            $("#dateResponseTimeText").dxTextBox("instance").option("value", filterValue[i].ResponseTimeText + "dk");
+                        }
+                    }
+
+
+
+
+
+
+                    treeView.selectItem(value);
+                }
+            }
+
+        }
+    }
+
+    function onValueChangeOpenedTime(e) {
+        var deger1 = $("#dateResponseTimeText").dxTextBox("instance").option("value");
+        var deger2 = $("#dateResolutionTimeText").dxTextBox("instance").option("value");
+        if (deger1 != null && deger2 != null) {
+            changedDeger1 = deger1.slice(0, deger1.length - 2);
+            changedDeger2 = deger2.slice(0, deger2.length - 2);
+
+            if (changedDeger1 != null && changedDeger2 != null) {
+                $("#dateResponseTime").dxDateBox("instance").option("value", moment(e.value).add(parseInt(deger1), 'm').toDate());
+                $("#dateResolutionTime").dxDateBox("instance").option("value", moment(e.value).add(parseInt(deger1) + parseInt(deger2), 'm').toDate());
+            }
+        }
+    }
+
+    function noteKaydet(e) {
+
+        var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+
+        FormDataNoteFile.append("TicketId", data.Id);
+        FormDataNoteFile.append("NoteText", $("#textTicketNote").dxTextArea("instance").option("value"));
+
+        $.ajax({
+            url: "Tickets?handler=AddNote",
+            headers: ajaxHeader,
+            data: FormDataNoteFile,
+            contentType: false,
+            processData: false,
+            type: 'post',
+            success: function () {
+                FormDataNoteFile.delete('noteFile');
+                FormDataNoteFile.delete('TicketId');
+                FormDataNoteFile.delete('NoteText');
+                $("#ticketNotesGrid").dxDataGrid("instance").refresh();
+                $("#textTicketNote").dxTextArea("instance").option("value", null);
+                $("#file-uploader").dxFileUploader("instance").reset();
+
+
+            }
+        });
+    }
+    function treeBox_valueChangedReason(e) {
+        if (e.component.content() == null)
+            return;
+
+        var $treeView = e.component.content().find(".dx-treeview");
+
+        if ($treeView.length) {
+            syncTreeViewSelection($treeView.dxTreeView("instance"), e.value);
+        }
+
+
+        //todo  :  asg grouba göre filtreleme işlemi yapılcak
+        //$("#sbAsgGroup").dxSelectBox("instance").option("value", null);
+        //$("#sbAsgGroupEmp").dxSelectBox("instance").option("value", null);
+        //if (e.value) {
+        //    if (e.value[0]) {
+        //        var reasonValue = $("#ticketForm").dxForm("instance").option("formData").reasonCategory;
+        //        var asgGroup = $("#sbAsgGroup").dxSelectBox("instance").getDataSource().items();
+        //        var itemAsgGroup = [];
+        //        //$("#sbAsgGroup").dxSelectBox("instance").getDataSource()
+        //        asgGroup.filter(function (e2) {
+        //            if (e2.reasonId == reasonValue[0]) {
+        //                itemAsgGroup.push(e2);
+        //            }
+        //        })
+        //        if (itemAsgGroup.length != 0) {
+        //            $("#sbAsgGroup").dxSelectBox("instance").option("items", itemAsgGroup);
+        //        }
+        //        else {
+        //            $("#sbAsgGroup").dxSelectBox("instance").getDataSource().reload();
+        //        }
+        //    }
+        //}
+        //else {
+        //    $("#sbAsgGroup").dxSelectBox("instance").getDataSource().filter(null);
+        //    $("#sbAsgGroup").dxSelectBox("instance").getDataSource().reload();
+        //}
+    }
+
+    function TicketRelatedLocationsFunc(container, options) {
+        if (options.data.TicketRelatedLocations == null) {
+            return;
+        }
+        let myArr = options.data.Attachments = options.data.TicketRelatedLocations
+        let result;
+        myArr.forEach((index, idx, array) => {
+
+            $('<div style="font-weight:700"/>').addClass('dx-text')
+                .text(index.TicketLocation.LocationName)
+                .appendTo(container);
+
+        });
+        return result;
+    }
+
+    function TicketNoteGridCellTemplate(container, options) {
+
+        if (options.data.Attachments == null) {
+            return;
+        }
+        let myArr = options.data.Attachments;
+
+        myArr.forEach((index, array) => {
+            $('<a/>').addClass('dx-link')
+                .text(index.FolderName)
+                .on('dxclick', function () {
+                    var url = `Tickets?handler=FileNoteAttachments`;
+                    $.ajax({
+                        type: 'GET',
+                        url: url,
+                        data: { "Id": options.data.Id, "attachmentId": index.Id },
+                        beforeSend: function (xhr) {
+                        },
+                        success: function (data) {
+
+                            var byte = base64ToArrayBuffer(data);
+                            saveByteArray([byte], index.FolderName, index.FileType);
+                        }
+                    });
+                })
+                .append("<br />")
+                .appendTo(container)
+        });
+    }
+
+    function ticketAttachmentGridCellTemplate(container, options) {
+        if (options.data == null) {
+            return;
+        }
+
+        var folderName = options.data.FolderName;
+        $('<a/>').addClass('dx-link')
+            .text(folderName)
+            .on('dxclick', function () {
+                var url = `Tickets?handler=FileAttachments&Id=${options.data.Id}`;
+                    $.ajax({
+                        type: 'GET',
+                        url: url,
+                        data: { "Id": options.data.Id},
+                        beforeSend: function (xhr) {
+                            //xhr.setRequestHeader('Authorization', sessionStorage.getItem("token"))
+                        },
+                        success: function (data) {
+                            var byte = base64ToArrayBuffer(data);
+                            saveByteArray([byte], options.data.FolderName,options.data.FileType);
+                        }
+                    });
+                })
+                .append("<br />")
+                .appendTo(container)
+
+    }
+
+    function base64ToArrayBuffer(base64) {
+        var binaryString = window.atob(base64);
+        var binaryLen = binaryString.length;
+        var bytes = new Uint8Array(binaryLen);
+        for (var i = 0; i < binaryLen; i++) {
+            var ascii = binaryString.charCodeAt(i);
+            bytes[i] = ascii;
+        }
+        return bytes;
+    }
+
+    var saveByteArray = (function () {
+        var a = document.createElement("a");
+        document.body.appendChild(a);
+        a.style = "display: none";
+        return function (data, name, type) {
+            var blob = new Blob(data, { type: type }),
+                url = window.URL.createObjectURL(blob);
+            a.href = url;
+            a.download = name;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        };
+    }());
+
+
+
+    function btn_ticketStateOnClick(e) {
+
+
+        if (e.itemData.Id == 1 || e.itemData.Id == 2) {
+            $("#popupAssignedUser").dxPopup("show");
+            return;
+        }
+
+
+        @*dataRow.TicketStatusId = e.itemData.Id;
+
+        var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+        $.ajax({
+            type: "POST",
+            url: "Tickets?handler=Send",
+            headers: ajaxHeader,
+            data: JSON.stringify(dataRow),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            async: true,
+            success: function (response) {
+                $("#gridTicket").dxDataGrid("instance").refresh();
+            },
+            failure: function (response) {
+                alert(response);
+            }
+        });
+
+        if (!dataRow) return;*@
+
+
+    }
+
+    function cellTemplate_TimeRemaining(container, options) {
+        let countDownDate = new Date(moment(options.data.ExpectedResponseTime)).getTime();
+        let timeRemaining = setInterval(function () {
+            if (options.data.TicketStatusId == 6 || options.data.TicketStatusId == 7) {
+                clearInterval(timeRemaining);
+                if (document.getElementById("clock" + options.data.Id)) {
+                    document.getElementById("clock" + options.data.Id).innerHTML = moment().format('DD/MM/YYYY HH:mm');
+                    return;
+                }
+                else
+                    clearInterval(timeRemaining);
+            }
+            let now = new Date().getTime();
+            if (options.data.TicketOpenedTime > moment().format()) {
+                if (document.getElementById("clock" + options.data.Id)) {
+                    document.getElementById("clock" + options.data.Id).innerHTML = `Planlı<br>(${moment(options.data.TicketOpenedTime).format('DD/MM/YYYY HH:mm')})`;
+                    return;
+                }
+                else
+                    clearInterval(timeRemaining);
+            }
+            let distance = countDownDate - now;
+            if (distance <= 0) {
+                clearInterval(timeRemaining);
+                if (document.getElementById("clock" + options.data.Id))
+                    //$("#iconAttention").attr("class","fas fa-check");
+                    options.row.cells[2].cellElement[0].firstElementChild.id = `${options.data.Id}deneme`;
+                    document.getElementById("clock" + options.data.Id).innerHTML = `Tamamlandı.`;
+                $(`#${options.data.Id}deneme`).removeClass("fas fa-clock").addClass("fas fa-check");
+                $(`#${options.data.Id}deneme`).css("display","block");
+                return;
+            }
+            let days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            let d = "g";
+            let hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            let h = "sa";
+            let minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            let m = "dk";
+            let seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            let s = "sn";
+            let zero = "";
+            if (days == 0) {
+                days = "";
+                d = "";
+            }
+            if (hours == 0) {
+                hours = "";
+                h = "";
+            }
+            if (minutes == 0) {
+                minutes = "";
+                m = "";
+            }
+            if (seconds < 10) {
+                zero = "0";
+            }
+            if (document.getElementById("clock" + options.data.Id)) {
+                options.row.cells[2].cellElement[0].firstElementChild.id = `${options.data.Id}deneme`;
+                $(`#${options.data.Id}deneme`).show(0).delay(500).hide(0);
+                document.getElementById("clock" + options.data.Id).innerHTML = `${days}${d} ${hours}${h} ${minutes}${m} ${zero}${seconds}${s}`;
+            }
+            else {
+                clearInterval(timeRemaining);
+            }
+
+        }, 1000);
+        $("<div id= 'clock" + options.data.Id + "''>")
+            .append()
+            .appendTo(container);
+    }
+
+    function btnStateTemplate(itemData) {
+            let sourceImg;
+        if (itemData.Id == 1)
+            sourceImg = `../../images/general/kisiteata.svg`;
+        if (itemData.Id == 2)
+            sourceImg = `../../images/general/grubaata.svg`;
+        if (itemData.Id == 3)
+            sourceImg = `../../images/general/calismayabasla.svg`;
+        if (itemData.Id == 4)
+            sourceImg = `../../images/general/cozumle.svg`;
+        if (itemData.Id == 5)
+            sourceImg = `../../images/general/askiyaal.svg`;
+        if (itemData.Id == 6)
+            sourceImg = `../../images/general/beklemeyeal.svg`;
+        if (itemData.Id == 7)
+            sourceImg = `../../images/general/yenidenac.svg`;
+        if (itemData.Id == 8)
+            sourceImg = `../../images/general/iptalet.svg`;
+        if (itemData.Id == 9)
+            sourceImg = `../../images/general/reddet.svg`;
+        if (itemData.Id == 10)
+            sourceImg = `../../images/general/kapat.svg`;
+
+            return `<div> <img style='float:left' src='${sourceImg}' /> <div style='float:left'>${itemData.Name}</div> </div>`;
+
+        //TODO Get from db later
+
+    }
+
+    function locationTreeBox_valueChanged(e) {
+        if (e.component.content() == null)
+            return;
+        var $treeView = e.component.content().find(".dx-treeview");
+        if ($treeView.length) {
+            syncTreeViewSelection($treeView.dxTreeView("instance"), e.value);
+        }
+    }
+    function onOpenedPriority(e) {
+        var listItems = e.component.content().find(".dx-list-item");
+        listItems[0].id = "priorityOne";
+        listItems[1].id = "priorityTwo";
+
+    }
+
+    function clearAll() {
+        $("#dropDownReasonMultipleFilter").dxDropDownBox("instance").option("value", null);
+        $("#dropDownLocationFilter").dxDropDownBox("instance").option("value", null);
+        $("#sbPriorityFilter").dxSelectBox("instance").option("value", null);
+        $("#sbTicketStateFilter").dxSelectBox("instance").option("value", null);
+        $("#sbTicketUserFilter").dxSelectBox("instance").option("value", null);
+        $("#textDescription").dxTextBox("instance").option("value", null);
+        $("#ticketCode").dxTextBox("instance").option("value", null);
+        $("#filterResponseTimeTargetedStart").dxDateBox("instance").option("value", null);
+        $("#filterResponseTimeTargetedEnd").dxDateBox("instance").option("value", null);
+        $("#filterResoluitonTimeTargetedStart").dxDateBox("instance").option("value", null);
+        $("#filterResoluitonTimeTargetedEnd").dxDateBox("instance").option("value", null);
+        $("#filterDeclarativeUser").dxTextBox("instance").option("value", null);
+        $("#txtPhoneFilter").dxTextBox("instance").option("value", null);
+        $("#filterDeclarativeUser").dxTextBox("instance").option("value", null);
+        $("#sbAssignedGroupFilter").dxSelectBox("instance").option("value", null);
+        $("#filterResponsedTime").dxDateBox("instance").option("value", null);
+        $("#filterResoluitonedTime").dxDateBox("instance").option("value", null);
+        $("#filterClosedTime").dxDateBox("instance").option("value", null);
+        $("#filterDateTicketStart").dxDateBox("instance").option("value",null);
+        $("#filterDateTicketEnd").dxDateBox("instance").option("value",null);
+
+
+    }
+    function onContentReadyButtonClean(e) {
+    }
+
+    function onOpenedPriorityFilter(e) {
+        var listItems = e.component.content().find(".dx-list-item");
+        listItems[0].id = "priorityOne";
+        listItems[1].id = "priorityTwo";
+    }
+
+    function btn_refreshGridClick(e) {
+        //to do :  sonra filtreleme kriterine göre getirilecek
+        $("#gridTicket").dxDataGrid("instance").refresh();
+    }
+    function OnInitialized(e) {
+        //console.log($("#gridTicket").dxDataGrid("instance").option())
+        //console.log(e.element.closest());
+        //console.log(e.element.dxButton(".dx-icon-edit"));
+        /*console.log(e.component.content().find(".dx-icon-edit"));*/
+        //console.log(e);
+        //console.log(e.component.find("td"));
+        //console.log(e.component.content().find("td"));
+        //console.log($('a[class=".dx-command-edit"]'));
+    }
+
+    function searchIcon(container,options) {
+        return "fa fa-search";
+    }
+
+    function onContentReadyGrid(e) {
+        var toolbar = e.element.find('.dx-datagrid-header-panel .dx-toolbar').dxToolbar('instance');
+        toolbar.on('optionChanged', function (arg) {
+            addCustomItem(toolbar);
+        });
+        addCustomItem(toolbar);
+
+        if ($(".classTable").length != 0) {
+            var tableCount = $(".classTable").length;
+            var tableArray = [];
+            tableArray = $(".classTable");
+            for (var i = 0; i < tableCount; i++) {
+                $("#dropDownLocation").dxDropDownBox("instance").option("value", null);
+                $("#locationTreeViewMultiple").dxTreeView("unselectAll");
+                tableArray[i].remove();
+            }
+        }
+        Tickets.init();
+    }
+
+
+    function addCustomItem(toolbar) {
+        var items = toolbar.option('items');
+        var myItem = DevExpress.data.query(items).filter(function (item) {
+            return item.name == 'myButton';
+        }).toArray();
+        if (!myItem.length) {
+            items.push({
+                id:'btn_refresh',
+                location: 'after',
+                widget: 'dxButton',
+                name: 'myButton',
+                options: {
+                    template: function (container, options) {
+                        return `<i class='dx-icon fas fa-redo'></i><span class='dx-button-text' id='timer'></span>`
+                    },
+                    hint: 'yenile',
+                    type: "default",
+                    onClick: function btn_refreshGridClick(e) {
+                        $("#gridTicket").dxDataGrid("instance").refresh();
+
+                    },
+                },
+            });
+            toolbar.option('items', items);
+        }
+    }
+
+
+    $(function ()
+    {
+        $("#ticketSearch").parent().css("padding-right", "0px");
+    })
+
+    var tabsData;
+    function tabs_Initialized(e) {
+        tabsData = e.component;
+        var tabs = e.component;
+        tabsData = tabs;
+        tabs.option("items[1].disabled", true);
+        $("#btnEdit").attr("hidden", true);
+    }
+
+    function onclickMahalPopup(e) {
+        $("#popupContainerMahal").dxPopup("show");
+
+        if (data != null) {
+            if (locationsWithPopup.length != 0) {
+                let locations = [];
+                locationsWithPopup.forEach((location, index, array) => {
+                    locations.push(location.HierarchyId);
+                });
+
+                $("#dropDownLocation").dxDropDownBox("instance").option("value", locations);
+
+
+                for (var i = 0; i < locationsWithPopup.length; i++) {
+
+                    $("#locationTreeViewMultiple").dxTreeView("selectItem", locationsWithPopup[i].HierarchyId);
+                }
+            }
+        }
+
+    }
+
+    $(function () {
+        $("#popupContainerMahal").dxPopup({
+            title: "Popup Title",
+            contentTemplate: LocationPopup,
+            showCloseButton: true,
+            toolbarItems: [{
+                text: "Mahal Ekle",
+
+                location: "before"
+            },
+                {
+                    widget: "dxButton",
+                    toolbar: 'top',
+                    location: "after",
+                    options: {
+                        type: 'success',
+                        text: "Kaydet",
+                        icon:"save",
+                        onClick: function (e) {
+                            $("#popupContainerMahal").dxPopup("hide");
+                            /*var lenghtDp = $("#dropdownLocation").dxDropDownBox("instance").option("value");*/
+                            var lengthDP = $("#dropDownLocation").dxDropDownBox("instance").option("value");
+                            $("#addMahalButton").dxButton("instance")._$element.children().children().children()[0].innerHTML = `${lengthDP.length}`;
+                        }
+                    }
+                },
+                {
+                widget: "dxButton",
+                toolbar: 'top',
+                location: "after",
+                options: {
+                    type:"default",
+                    text: "Kapat",
+                    icon: "close",
+                    onClick: function (e)
+                    {
+
+                        if ($(".classTable").length != 0) {
+                            var tableCount = $(".classTable").length;
+                            var tableArray = [];
+                            tableArray = $(".classTable");
+                            for (var i = 0; i < tableCount; i++) {
+                                $("#dropDownLocation").dxDropDownBox("instance").option("value", null);
+                                $("#locationTreeViewMultiple").dxTreeView("unselectAll");
+                                tableArray[i].remove();
+                            }
+                        }
+                        $("#popupContainerMahal").dxPopup("hide");
+                    }
+                }
+            }
+
+
+            ]
+        });
+    });
+
+
+    //kişiye ata popupı
+    $(function () {
+        $("#popupAssignedUser").dxPopup({
+            title: "Kişiye Ata",
+            contentTemplate: AssignUserPopup,
+            showCloseButton: true,
+            width: 600,
+            height:200,
+            toolbarItems: [{
+                text: "Kişi Seç",
+                location: "before"
+            },
+            {
+                widget: "dxButton",
+                toolbar: 'top',
+                location: "after",
+                options: {
+                    type: 'success',
+                    text: "Kaydet",
+                    icon: "save",
+                    onClick: function (e) {
+
+                        var userId = $("#assignedUser").dxSelectBox("instance").option("value");
+                        var ajaxHeader = {};
+                        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+                        $.ajax({
+                            type: "POST",
+                            url: "Tickets?handler=ChangeTicketState",
+                            headers: ajaxHeader,
+                            data: { "Id": ticketStateId, "ticketStateId": ticketStatusId, "userId": userId, "ticketId": data.Id },
+                            async: true,
+                            success: function (response) {
+                                $("#popupAssignedUser").dxPopup("hide");
+                                $("#popupContainer").dxPopup("hide");
+                                $("#gridTicket").dxDataGrid("instance").refresh();
+                                $("#assignedUser").dxSelectBox("instance").option("value",null);
+                            },
+                            failure: function (response) {
+                                alert(response);
+                            }
+                            });
+                    }
+                }
+            },
+            {
+                widget: "dxButton",
+                toolbar: 'top',
+                location: "after",
+                options: {
+                    type: "default",
+                    text: "Kapat",
+                    icon: "close",
+                    onClick: function (e) {
+                        $("#popupAssignedUser").dxPopup("hide");
+                        $("#assignedUser").dxSelectBox("instance").option("value", null);
+                    }
+                }
+            }
+            ]
+        });
+    });
+
+
+    var count =0;
+    function OnItemSelectionChangedLocationTm(args) {
+
+        count = count + 1;
+
+        if (args.itemData.selected == true) {
+            $("#dropDownLocation").dxDropDownBox("instance").option("value", args.component.getSelectedNodeKeys());
+            $("#selectedLocation").append(`
+<table id="table${args.itemData.Id}" class="table table-bordered classTable">
+  <thead>
+  </thead>
+  <tbody>
+    <tr>
+      <th class="col-md-2" scope="row">${count}</th>
+      <td class="col-md-5">${args.itemData.LocationName}</td>
+      <td class="col-md-5">
+<button style="display: block;margin: auto;" type="button" id="location${args.itemData.Id}" name="location${args.node.key}" class="btn btn-primary" onclick="onDeleteLocation(this)">Kaldır</button></td>
+    </tr
+  </tbody>
+</table>`)
+        }
+        else {
+            $(`#table${args.itemData.Id}`).remove();
+            for (var i = 0; i < $(".classTable").length; i++) {
+                $(".classTable")[i].rows[0].cells[0].innerHTML = `${i + 1}`;
+            }
+            count = $(".classTable").length;
+            locationsUpdate.push(args.node.key);
+        }
+    }
+
+    function onDeleteLocation(a) {
+        var str = a.id.toString();
+        var strName = a.name;
+
+        var stringId = str.substring(8);
+        var stringName = strName.substring(8);
+        var countdp = $(".classTable").length;
+        var selectedItemsArr = [];
+        $(`#table${stringId}`).remove();
+        const index = locationsUpdate.indexOf(stringName);
+        locationsUpdate.splice(index, 1);
+
+        for (var i = 0; i < $(".classTable").length; i++) {
+            $(".classTable")[i].rows[0].cells[0].innerHTML = `${i + 1}`;
+        }
+
+        count = $(".classTable").length;
+
+        for (var i = 0; i < $("#locationTreeViewMultiple").dxTreeView("getSelectedNodes").length; i++) {
+
+            if ($("#locationTreeViewMultiple").dxTreeView("getSelectedNodes")[i].key == stringName) {
+
+                $("#locationTreeViewMultiple").dxTreeView("unselectItem", stringName);
+                var selectedItems = $("#dropDownLocation").dxDropDownBox("instance").option("value");
+                for (var i = 0; i < selectedItems.length; i++) {
+                    if (selectedItems[i] != stringName) {
+                        selectedItemsArr.push(selectedItems[i]);
+                    }
+                }
+                $("#dropDownLocation").dxDropDownBox("instance").option("value", selectedItemsArr);
+            }
+        }
+    }
+    function cellTemplate_CurrentStatus(container, options) {
+
+        var icon;
+        if (options.data.TicketPriorityId == 2) {
+            container.css("background-color", "red");
+        }
+        if (options.data.TicketPriorityId == 3) {
+            container.css("background-color", "yellow");
+        }
+
+
+        if (options.data.TicketStatusId == 1)
+            $("<div>")
+                .append($("<img>", { "src": "../../images/general/01_acik.svg" }))
+                .appendTo(container);
+
+        else if (options.data.TicketStatusId == 2)
+            $("<div>")
+                .append($("<img>", { "src": "../../images/general/02_atandi.svg" }))
+                .appendTo(container);
+        else if (options.data.TicketStatusId == 3)
+            $("<div>")
+                .append($("<img>", { "src": "../../images/general/03_calisiliyor.svg" }))
+                .appendTo(container);
+        else if (options.data.TicketStatusId == 4)
+            $("<div>")
+                .append($("<img>", { "src": "../../images/general/06_cozumlendi.svg" }))
+                .appendTo(container);
+        else if (options.data.TicketStatusId == 5)
+            $("<div>")
+                .append($("<img>", { "src": "../../images/general/07_kapali.svg" }))
+                .appendTo(container);
+        else if (options.data.TicketStatusId == 6)
+            $("<div>")
+                .append($("<img>", { "src": "../../images/general/06_cozumlendi.svg" }))
+                .appendTo(container);
+        else if (options.data.TicketStatusId == 7)
+            $("<div>")
+                .append($("<img>", { "src": "../../images/general/04_beklet.svg" }))
+                .appendTo(container);
+        else if (options.data.TicketStatusId == 8)
+            $("<div>")
+                .append($("<img>", { "src": "../../images/general/05_reddet.png" }))
+                .appendTo(container);
+        else
+            $("<div>")
+                .append($("<img>", {}))
+                .appendTo(container);
+    }
+
+    function ticketGridDataExporting(e) {
+        let workbook = new ExcelJS.Workbook();
+        let worksheet = workbook.addWorksheet('tickets');
+
+        DevExpress.excelExporter.exportDataGrid({
+            component: e.component,
+            worksheet: worksheet,
+            autoFilterEnabled: true
+        }).then(function () {
+            workbook.xlsx.writeBuffer().then(function (buffer) {
+                saveAs(new Blob([buffer], { type: 'application/octet-stream' }), 'IsEmirleri.xlsx');
+            });
+        });
+        e.cancel = true;
+    }
+
+
+    function onChangeFilterResponseTimeTargetedStart(e) {
+        $("#filterResponseTimeTargetedEnd").dxDateBox("instance").option("min", e.value);
+    }
+
+    function onChangeFilterResponseTimeTargetedEnd(e) {
+        $("#filterResponseTimeTargetedStart").dxDateBox("instance").option("max", e.value);
+    }
+    function onChangeFilterResoluitonTimeTargetedStart(e) {
+        $("#filterResoluitonTimeTargetedEnd").dxDateBox("instance").option("min", e.value);
+        
+    }
+    function onChangeFilterResoluitonTimeTargetedEnd(e) {
+        $("#filterResoluitonTimeTargetedStart").dxDateBox("instance").option("max", e.value);
+    }
+
+    function onValueChangefilterDateTicketStartStart(e) {
+        $("#filterDateTicketEnd").dxDateBox("instance").option("min", e.value);
+    }
+
+    function onValueChangefilterDateTicketStartEnd(e) {
+        $("#filterDateTicketStart").dxDateBox("instance").option("max", e.value);
+    }
+    function btn_ticketFindClick() {
+
+        var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+        var FormDataFilter = new FormData();
+        var dpReasonMultipleFilter = $("#dropDownReasonMultipleFilter").dxDropDownBox("instance").option("value");
+        var dpLocationFilter = $("#dropDownLocationFilter").dxDropDownBox("instance").option("value");        
+        var sbPriorityFilter = $("#sbPriorityFilter").dxSelectBox("instance").option("value");
+        var sbTicketStateFilter = $("#sbTicketStateFilter").dxSelectBox("instance").option("value");
+        var sbTicketUserFilter = $("#sbTicketUserFilter").dxSelectBox("instance").option("value");
+        var textDescription=$("#textDescription").dxTextBox("instance").option("value");
+        var ticketCode =  $("#ticketCode").dxTextBox("instance").option("value");
+        //var filterResponseTime = $("#filterResponseTime").dxTextBox("instance").option("value");
+        //var filterResoluitonTime = $("#filterResoluitonTime").dxTextBox("instance").option("value");
+        var filterResponseTimeTargetedStart = $("#filterResponseTimeTargetedStart").dxDateBox("instance").option("value");
+        var filterResponseTimeTargetedEnd = $("#filterResponseTimeTargetedEnd").dxDateBox("instance").option("value");
+        var filterResoluitonTimeTargetedStart = $("#filterResoluitonTimeTargetedStart").dxDateBox("instance").option("value");
+        var filterResoluitonTimeTargetedEnd= $("#filterResoluitonTimeTargetedEnd").dxDateBox("instance").option("value");
+        var filterDeclarativeUser =$("#filterDeclarativeUser").dxTextBox("instance").option("value");
+        var txtPhoneFilter =$("#txtPhoneFilter").dxTextBox("instance").option("value");        
+        var sbAssignedGroupFilter= $("#sbAssignedGroupFilter").dxSelectBox("instance").option("value");
+        var filterResponsedTime= $("#filterResponsedTime").dxDateBox("instance").option("value");
+        var filterResoluitonedTime= $("#filterResoluitonedTime").dxDateBox("instance").option("value");
+        var filterClosedTime= $("#filterClosedTime").dxDateBox("instance").option("value");
+        var filterDateTicketStart = $("#filterDateTicketStart").dxDateBox("instance").option("value");
+        var filterDateTicketEnd = $("#filterDateTicketEnd").dxDateBox("instance").option("value");
+
+       
+
+        FormDataFilter.append("TicketReasonIds", dpReasonMultipleFilter);
+        FormDataFilter.append("FilterLocationIds", dpLocationFilter);
+        FormDataFilter.append("PriorityId", sbPriorityFilter);
+        FormDataFilter.append("TicketStatusId", sbTicketStateFilter);
+        FormDataFilter.append("UserId", sbTicketUserFilter);
+        FormDataFilter.append("TicketDescription", textDescription);
+        FormDataFilter.append("TicketCode", ticketCode);
+        //FormDataFilter.append("TicketResponseTime", filterResponseTime);
+        //FormDataFilter.append("TicketResolutionTime", filterResoluitonTime);
+        FormDataFilter.append("TicketResponseTimeTargetedStart", (new Date(filterResponseTimeTargetedStart)).toUTCString(3));
+        FormDataFilter.append("TicketResponseTimeTargetedEnd", (new Date(filterResponseTimeTargetedEnd)).toUTCString(3));
+        FormDataFilter.append("TicketResolutionTimeTargetedStart", (new Date(filterResoluitonTimeTargetedStart)).toUTCString(3));
+        FormDataFilter.append("TicketResolutionTimeTargetedEnd", (new Date(filterResoluitonTimeTargetedEnd)).toUTCString(3));
+        FormDataFilter.append("DeclarativeUser", filterDeclarativeUser);
+        FormDataFilter.append("PhoneNumber", txtPhoneFilter);
+        FormDataFilter.append("AssignedGroupId", sbAssignedGroupFilter);
+        FormDataFilter.append("ResponsedTime", (new Date(filterResponsedTime)).toUTCString(3));
+        FormDataFilter.append("ResoulitionedTime", (new Date(filterResoluitonedTime)).toUTCString(3));
+        FormDataFilter.append("TicketClosedTime", (new Date(filterClosedTime)).toUTCString(3));
+        FormDataFilter.append("TicketDateTicketStart", (new Date(filterDateTicketStart)).toUTCString(3));
+        FormDataFilter.append("TicketDateTicketEnd", (new Date(filterDateTicketEnd)).toUTCString(3));
+        
+
+        $.ajax({
+            url: "Tickets?handler=Filter",
+            headers: ajaxHeader,
+            data: FormDataFilter,
+            contentType: false,
+            processData: false,
+            type: 'post',
+            success: function (response) {
+                $("#gridTicket").dxDataGrid("instance").option("dataSource", response.data);
+            }
+        });
+    }
+
+</script>
+
+
+
+<style>
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+
+    .title h3 {
+        font-family: 'Segoe UI Light', 'Helvetica Neue Light', 'Segoe UI', 'Helvetica Neue', 'Trebuchet MS', Verdana;
+        font-weight: 200;
+        font-size: 24px;
+        text-align: center;
+    }
+
+    #gridTicket {
+        padding - left: 10px;
+        padding-right: 10px;
+    }
+
+    .btn-group {
+        display: block;
+        text-align: right;
+        margin-right: 10px;
+        margin-bottom: 5px;
+    }
+
+    img {
+        height: 25px;
+        width: 25px;
+        display: block;
+    }
+
+    #ticketSearch {
+        width: 108px !important;
+    }
+
+    #btn_refresh {
+        text - align: center;
+        height: 38px;
+        /*background-color: #337ab7;*/
+    }
+</style>
+
+<style>
+
+    #frmTicket {
+        padding: 20px;
+    }
+</style>
+
+<style>
+
+    #ticketForm {
+        padding: 10px;
+    }
+
+    #textTicketNote {
+        margin: 20px;
+    }
+
+    #ticketNotesGrid {
+        margin: 20px;
+    }
+
+    #ticketAttachmentGrid {
+        margin: 20px;
+    }
+
+    #ticketHistory {
+        margin: 20px;
+    }
+
+    .edit-actions {
+        width: 100%;
+        margin-top: 10px;
+        text-align: right;
+    }
+
+    .dx-overlay-modal .edit-label {
+        width: 100%;
+        margin-bottom: 10px;
+        font-size: 16px;
+        color: #828282;
+        font-weight: bold;
+        border-bottom: 1px solid #828282;
+    }
+
+    .content h4 {
+        margin-bottom: 10px;
+        font-weight: 500;
+        font-size: 18px;
+    }
+
+    .content {
+        margin-top: 50px;
+        margin-left: 10px;
+    }
+
+    .selected-item {
+        margin-bottom: 20px;
+    }
+
+    #selected-files {
+        display: none;
+    }
+
+    #fileuploader-container {
+        border: 1px solid #d3d3d3;
+        margin: 20px 20px 0 20px;
+    }
+
+    .diasClass {
+        text-align: left !important;
+        border-right-width: 0px !important;
+        border-left-width: 0px !important;
+        border-top-width: 0px !important;
+        /*border-bottom-width: 0px !important;*/
+    }
+
+    .dx-command-edit {
+        /*border-bottom-width: 0px !important;*/
+        border-left-width: 0px !important;
+    }
+
+    .dx-command-edit-with-icons {
+        padding-top: 15px !important;
+    }
+
+    /*.dx-tab{
+            width:200px;
+        }*/
+    .dx-item .dx-tab {
+        width: 200px !important;
+    }
+
+
+    /*.dx-icon-close {
+        color: white !important;
+    }*/
+
+    .dx-toolbar-items-container {
+        height: 50px !important;
+    }
+
+    .dx-popup-content {
+        padding-top: 0px !important;
+    }
+
+    #stateImgId > div > img {
+        height: 30px !important;
+        width: 30px !important;
+    }
+
+    .dpbColor {
+        background-color: #337ab7;
+        border-radius: 4px;
+    }
+
+    .dx-toolbar-label {
+        position: relative;
+        left: 30px;
+    }
+
+    #dpbId > span {
+        color: white !important;
+    }
+    /*.dx-button-text {
+        color: white !important;
+    }*/
+    /*#ticketClean{
+            background-color:yellow !important;
+        }
+            #ticketClean :hover {*/
+    /*filter: brightness(60%) !important;*/
+    /*background-image: linear-gradient(hsla(0,0%,0%,.2) 100%,transparent 100%) !important;
+            }*/
+    /*#ticketClean {
+        background-color: orange !important;*/
+    /*color: orange !important;*/
+    /*border-color: #ffca51 !important;
+    }
+
+        #ticketClean.dx-state-hover {
+            background-color: darkorange !important;*/
+    /*color: black !important;*/
+    /*}
+
+        #ticketClean.dx-state-active {
+            background-color: darkorange !important;*/
+    /*color: black !important;*/
+    /*}*/
+    #priorityOne {
+        background-color: red;
+    }
+
+    #priorityTwo {
+        background-color: yellow;
+    }
+
+    .warning {
+        background-color: yellow !important;
+        /*color: orange !important;*/
+    }
+
+        .warning.dx-state-hover {
+            background-color: #e4e50a !important;
+            /*color: black !important;*/
+        }
+
+        .warning.dx-state-active {
+            background-color: #e4e50a !important;
+            /*color: black !important;*/
+        }
+
+    #noteButton {
+        margin-left: 730px !important;
+    }
+
+    #ticketSearch {
+        width: 100% !important;
+    }
+
+
+    #btn_refresh {
+        position: relative;
+        top: 45px;
+        z-index: 1;
+        left: 888px;
+    }
+
+    .card-body {
+        padding-top: 0px;
+        padding-bottom: 20px;
+    }
+
+    .dx-datagrid-text-content {
+        color: black;
+        font-weight: 700;
+    }
+
+    .classTable {
+        margin-top: 20px;
+    }
+
+    #attachmentButtonDiv {
+        float: right;
+        margin-top: 5px;
+    }
+
+    .fas fa-ellipsis-v {
+        color: white;
+    }
+
+    .dx-button-mode-outlined .dx-icon {
+        color: white;
+    }
+
+    .dx-button-mode-outlined {
+        background-color: transparent;
+        border-color: #ddd;
+        color: white;
+    }
+
+    .dx-datagrid-export-button {
+        background-color: #337ab7;
+    }
+
+    .dx-icon-export-to {
+        color: white !important;
+    }
+
+    .dx-icon-export-excel-button {
+        color: white !important;
+    }
+
+
+    .dx-datagrid-export-button.dx-state-hover {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-export-button.dx-state-active {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+
+    .dx-datagrid-column-chooser-button {
+        background-color: #337ab7;
+    }
+
+    .dx-icon-column-chooser {
+        color: white !important;
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-hover {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .dx-datagrid-column-chooser-button.dx-state-active {
+        background-color: #285f8f !important;
+        /*color: black !important;*/
+    }
+
+    .swal2-container {
+        z-index: 10001 !important;
+    }
+
+    #addMahalButton {
+        padding-top: 5px !important;
+    }
+
+    #dropDownReasonSingle {
+        width: 402px;
+    }
+</style>
+

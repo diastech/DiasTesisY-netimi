@@ -1,0 +1,999 @@
+﻿@page
+
+@using static DiasShared.Enums.Standart.TicketEnums
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Custom
+@*@model DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Custom.CustomTicketDto*@
+@model DIAS.UI.Pages.Ticket.CustomPeriodicTicketDto
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+
+
+<script src="~/js/pages/shared/reason.js"></script>
+<script src="~/js/pages/shared/location.js"></script>
+
+<div id="accordion">
+    <div class="card">
+        <div class="card-header" id="headingOne">
+            <h5 class="mb-0">
+                <button class="btn btn-link" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                    <i style="margin-right:5px" class="fa fa-filter" aria-hidden="true"></i>Filtre
+                </button>
+            </h5>
+        </div>
+
+        <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">
+            <div class="card-body">
+                @(Html.DevExtreme().Form().ID("#frmPeriodicTicketFilter").ColCount(3).ShowColonAfterLabel(false).Items(items =>
+            {
+            items.AddSimple().ColSpan(2).Label(l => l.Text("Arama Nedeni"))
+                .Template(@<text> @await Html.PartialAsync("_ReasonTemplate")</text>);
+
+                items.AddSimple().ColSpan(2).Label(l => l.Text("Mahal"))
+                .Template(new TemplateName("dpPTFilterLocationTemplate"));
+
+                items.AddSimple().ColSpan(2).Label(l => l.Text("Öncelik"))
+                .Template(new TemplateName("sbPTFilterPriorityTemplate"));
+
+                items.AddSimple().ColSpan(2).Label(l => l.Text("Sorumlu Kişi"))
+                .Template(new TemplateName("sbPTFilterTicketUserTemplate"));
+
+                items.AddSimple().Label(l => l.Text("Açıklama")).Editor(e => e.TextBox().ID("textDescription").ShowClearButton(true));
+                items.AddButton()
+                    .ButtonOptions(a => a.Text("Ara")
+                    .Height(40)
+                    .Width(180)
+                    .ID("ticketSearch")
+                    .Icon("fas fa-search")
+                    .Type(ButtonType.Default)
+                    //.OnClick("Tickets.btn_ticketFindClick")
+                    .UseSubmitBehavior(true)
+                    .Template(@<text>
+                                <div id="widget"></div>
+	                            <i class="dx-icon fas fa-search"></i>
+                                <span class="dx-button-text"><%- text %></span>
+                            </text>)
+                            .Hint("Kayıtları Filtrele"))
+                        .HorizontalAlignment(HorizontalAlignment.Right);
+                }))
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header" id="headingTwo">
+            <h5 class="mb-0">
+                <button class="btn btn-link" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
+                    <i style="margin-right:5px" class="fa fa-calendar" aria-hidden="true"></i>Periyodik İş Emirlerim
+                </button>
+            </h5>
+        </div>
+        <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+            <div class="card-body">
+                @(Html.DevExtreme().DataGrid<CustomPeriodicTicketDto>()
+                .ID("gridTicket")
+                .DataSource(ds => ds.RemoteController().OnBeforeSend("beforeSend")
+                .Key("Id")
+                .LoadUrl(Url.Page(null, "GridData"))
+                .InsertUrl(Url.Page(null, "GridRow"))
+            ).ErrorRowEnabled(false)
+                .OnToolbarPreparing("onToolbarPreparing")
+                .RemoteOperations(true)
+                .ShowBorders(true)
+                 .SearchPanel(searchPanel => searchPanel
+
+                    .Placeholder("Listede Ara...")
+                    .Visible(true)
+                )
+
+                 .FilterRow(f => f.Visible(true))
+                    .HeaderFilter(h => h.Visible(true))
+                    .GroupPanel(p => p.Visible(true).EmptyPanelText(""))
+                    .Grouping(g => g.AutoExpandAll(false))
+
+                .Paging(p => p.PageSize(10))
+                    .Pager(pager => pager.ShowNavigationButtons(true).ShowInfo(true).ShowPageSizeSelector(true).AllowedPageSizes(new JS("[20, 50, 100]")))
+
+            .Editing(e => e.Mode(GridEditMode.Popup)
+                    .AllowUpdating(true)
+                    .AllowAdding(true)                    
+                    .Popup(p => p
+                        .Title("Planlı İş Emri Düzenle")
+                        .ID("popupContainer")
+                        .ShowTitle(true)
+                        .Width(1000)
+                        .Height(525)
+                        .OnShowing("setPopupTitle")
+                        .ShowCloseButton(true)
+                    )
+                .Form(f => f.Items(items =>
+                {
+                    items.AddGroup()
+                    .Items(groupItems =>
+                    {
+                        groupItems.AddTabbed()
+                        .TabPanelOptions(o =>
+                        {
+                            o.DeferRendering(false);
+                            o.AnimationEnabled(true);
+                            o.ID("ticketTab");
+                            o.Width(950);
+                            o.AnimationEnabled(true);
+                            o.ShowNavButtons(true);
+                            o.Height("100%");
+                        })
+
+                        .Tabs(tabItems =>
+                        {
+                            tabItems.Add().Icon("fas fa-save")
+                                    .Title("Ticket Bilgileri")
+                                    .Items(tabItem =>
+                                    {
+
+                                        tabItem.AddSimpleFor(m => m.PeriodicName)
+                                        .Label(l => l.Text("Plan Adı").Visible(false)).Editor(e => e.TextBox().ID("textPeriodicName")
+                                        .Placeholder("Plan Adı Giriniz..."))
+                                                    .ValidationRules(v =>
+                                                    {
+                                                        v.AddRequired().Message("Plan Adı Boş Geçilemez");
+                                                    });
+
+                                        tabItem.AddSimpleFor(m => m.StartDateTime)
+                                                        .Label(l => l.Text("Başlangıç Tarihi").Visible(false)).Editor(e => e.DateBox().ID("dateStartPT")
+                                                        .ShowClearButton(true)
+                                                        .Type(DateBoxType.DateTime)
+                                                        .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+                                                        .Placeholder("Başlangıç Tarih seçiniz."))
+                                        .ValidationRules(v =>
+                                        {
+                                            v.AddRequired().Message("Başlangıc Tarihi boş geçilemez.");
+                                        });
+
+                                        tabItem.AddSimpleFor(m => m.EndDateTime)
+                                                        .Label(l => l.Text("Bitiş Tarihi").Visible(false)).Editor(e => e.DateBox().ID("dateEndPT")
+                                                        .ShowClearButton(true)
+                                                        .Type(DateBoxType.DateTime)
+                                                        .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+                                                        .Placeholder("Bitiş Tarih seçiniz."))
+                                        .ValidationRules(v =>
+                                        {
+                                            v.AddRequired().Message("Bitiş Tarihi boş geçilemez.");
+                                        });
+
+
+                                        tabItem.AddSimpleFor(m => m.TicketReasonId)
+                                                .Label(l => l.Text("Arama Sebebi"))
+                                                .Editor(e => e.DropDownBox()
+                                            .ID("dropDownReasonSingle2")
+                                            .DataSource(d => d.RemoteController()
+                                            .Key("HierarchyId")
+                                            .LoadUrl(Url.Page(null, "TicketReasonData")))
+                                            .DeferRendering(false)
+                                            .ValueExpr("HierarchyId")
+                                            .DisplayExpr("CategoryName")
+                                            .DropDownOptions(o => o.Height(350))
+                                            .Placeholder("Arama sebebi seçiniz..")
+                                            .ShowClearButton(true)
+                                            .OnValueChanged("Reason.treeBox_valueChanged")
+                                            .ContentTemplate(
+                                                new TemplateName("resTemplate")
+                                            ))
+                                        .ValidationRules(v =>
+                                        {
+                                            v.AddRequired().Message("Arama Sebebi Boş Geçilemez");
+                                        });
+
+
+                                        tabItem.AddSimpleFor(m => m.LocationId).Label(l => l.Text("Mahal").Visible(false))
+                            .Editor(e => e.DropDownBox()
+                            .ID("dropDownLocation2")
+                            .DataSource(d => d.RemoteController()
+                            .Key("HierarchyId")
+                            .LoadUrl(Url.Page(null, "LocationData"))
+                            .LoadMode(DataSourceLoadMode.Raw))
+                            .DeferRendering(false)
+                            .ValueExpr("HierarchyId")
+                            .DisplayExpr("LocationName")
+                            .DropDownOptions(o => o.Height(350))
+                            .Placeholder("Mahal Seçiniz..")
+                            .ShowClearButton(true)
+                            .OnValueChanged("Location.treeBox_valueChanged")
+                            .ContentTemplate(
+                                new TemplateName("locTemplate")
+                            ))
+                                        .ValidationRules(v =>
+                                        {
+                                            v.AddRequired().Message("Mahal Bilgisi Boş Geçilemez");
+                                        });
+
+                                        tabItem.AddSimpleFor(m => m.TicketPriorityId).Label(l => l.Text("Öncelik").Visible(false)).Editor(e => e.SelectBox().ID("sbTicketPriority")
+                                            .DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+                                            .DisplayExpr("Text")
+                                            .Placeholder("Öncelik seçiniz.")
+                                            .ValueExpr("Value"))
+                                        .ValidationRules(v =>
+                                        {
+                                            v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                                        });
+                                        tabItem.AddSimpleFor(m => m.TicketAssignedUser.Id)
+                                            .Label(l => l.Text("Ticket Sahibi").Visible(false))
+                                            .Editor(e => e.SelectBox()
+                                            .ID("sbTicketUserId")
+                                            .DataSource(d => d.RemoteController()
+                                            .Key("Id")
+                                            .LoadUrl(Url.Page(null, "UserData")))
+                                            .DeferRendering(false)
+                                            .ValueExpr("Id")
+                                            .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+                                            .ShowClearButton(true)
+                                            .SearchEnabled(true)
+                                            .Placeholder("Bildiren kişi seçiniz.")
+                                            .SearchExpr("FirstName", "LastName", "UserName", "Email"))
+                                        .ValidationRules(v =>
+                                        {
+                                            v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                                        });
+                                        tabItem.AddSimpleFor(m => m.Option).Label(l => l.Text("Option").Visible(false)).Editor(e => e.SelectBox().ID("sbPTOption")
+                                            .DataSource(Html.GetEnumSelectList<TicketPeriodEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+                                            .DisplayExpr("Text")
+                                            .Placeholder("Zamanlama seçeneği seçiniz")
+                                            .ValueExpr("Value").OnValueChanged("onValueChangedOption"))
+                                            .ValidationRules(v =>
+                                            {
+                                                v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                                            });
+                                        tabItem.AddSimpleFor(m => m.isTime).Label(l => l.Visible(false)).Editor(e => e.CheckBox().ID("chPTisTime").Text("Saatlik mi").Value(false)
+                                          .OnValueChanged("onValueChangedIsTime"));
+                                        tabItem.AddSimpleFor(m => m.DayStartedTime)
+                                        .Label(l => l.Text("Tarih").Visible(false)).Editor(e => e.DateBox().ID("dateDayStartedTime")
+                                        .ShowClearButton(true)
+                                        .Type(DateBoxType.Time)
+                                        .DisplayFormat("HH:mm:ss")
+                                        .Placeholder("Başlangıç Saat Seçiniz."));
+
+                                        tabItem.AddSimpleFor(m => m.DayEndedTime)
+                                            .Label(l => l.Text("Tarih").Visible(false)).Editor(e => e.DateBox().ID("dateDayEndedTime")
+                                            .ShowClearButton(true)
+                                            .Type(DateBoxType.Time)
+                                            .DisplayFormat("HH:mm:ss")
+                                            .Placeholder("Bitiş Saat Seçiniz."));
+
+                                        tabItem.AddSimpleFor(m => m.Description)
+                                        .Label(l => l.Text("Açıklama").Visible(false)).Editor(e => e.TextArea().ID("textAreaDescription")
+                                        .Placeholder("Açıklama giriniz...").Height(150))
+                                        .ValidationRules(v =>
+                                        {
+                                            v.AddRequired().Message("Bildiren Kişi Boş Geçilemez");
+                                        });
+                                    });
+                        });
+                    });
+                }).ID("ticketForm"))
+            )
+        .Columns(columns =>
+        {
+            columns.Add()
+               .Caption("")
+               .AllowSearch(false)
+               .AllowSorting(false)
+               .Alignment(HorizontalAlignment.Center)
+               //.CellTemplate(new JS("Tickets.cellTemplate_CurrentStatus"))
+               .Width(41);
+            columns.AddFor(m => m.PeriodicName).Caption("Periyot Adı").AllowEditing(true);
+            columns.AddFor(m => m.AddedByUserId).Caption("Ekleyen Kullanıcı").AllowEditing(true);
+            columns.AddFor(y => y.TicketRelatedLocations).Caption("Lokasyon").AllowEditing(true);
+            columns.AddFor(y => y.TicketPriorityId).Caption("Öncelik").AllowEditing(true)
+            .Lookup(l => l.DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+                .ValueExpr("Value")
+                .DisplayExpr("Text"));
+            columns.AddFor(y => y.TickedAssignedAssignmentGroup.GroupName).Caption("Sorumlu Grup").AllowEditing(true);
+
+
+            columns.Add()
+                  .Caption("Kalan Süre")
+                  .AllowSearch(false)
+                  .AllowFiltering(false)
+                  .AllowGrouping(false)
+                  .AllowHeaderFiltering(false)
+                  .AllowHiding(false)
+                  .AllowReordering(false)
+                  .AllowResizing(false)
+                  .Alignment(HorizontalAlignment.Left)
+                  //.CellTemplate(new JS("Tickets.cellTemplate_TimeRemaining"))
+                  .Width(140);
+        })
+        .OnEditingStart(@<text> function(e) {onEditingStart(e) } </text>)
+        .OnInitNewRow(@<text> function(e) { OnInitNewRow(e); } </text>)
+
+
+        .MasterDetail(md => md
+        .Enabled(true)
+        .Template(@<text>
+            @(Html.DevExtreme().DataGrid<CustomTicketDto>()
+            .ColumnAutoWidth(true)
+            .ShowBorders(true)
+            .RemoteOperations(true)
+            .Columns(column =>
+            {
+                column.AddFor(m => m.TicketRelatedLocations).Caption("Lokasyon");
+                column.AddFor(m => m.TicketReason.ReasonName).Caption("Arama Sebebi");
+                column.AddFor(m => m.TickedAssignedAssignmentGroup.GroupName).Caption("Sorumlu Gurup");
+            })
+            .DataSource(d => d.RemoteController()
+            .Key("id")
+            .LoadUrl(Url.Page(null, "TicketDataById"))
+            .LoadParams(new { ticketId = new JS("data.Id") })
+            )
+
+            )
+
+        </text>)
+    )
+    )
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@using (Html.DevExtreme().NamedTemplate("locTemplate"))
+{
+    @(Html.DevExtreme().TreeView()
+    .ID("locationTreeViewMultiple2")
+    .DataSource(new JS(@"component.getDataSource()"))
+    .KeyExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .ParentIdExpr("ParentHierarchy")
+    .DataStructure(TreeViewDataStructure.Plain)
+    .SelectionMode(NavSelectionMode.Multiple)
+    .ShowCheckBoxesMode(TreeViewCheckBoxMode.Normal)
+    .SelectNodesRecursive(false)
+    .SelectByClick(true)
+    .Height(300)
+    .SearchEnabled(true)
+    .SearchEditorOptions(o => o.Placeholder("Mahal Ara"))
+    .SearchTimeout(500)
+    .OnItemClick(
+        @<text>
+            function(args) {
+                component.close();
+            }
+        </text>
+    )
+    .OnItemSelectionChanged(
+        @<text>
+            function(args) {
+                component.option("value", args.component.getSelectedNodeKeys());
+            }
+        </text>)
+    .OnContentReady(
+        @<text>
+            function(args) {
+                Location.syncTreeViewSelection(args.component, component.option("value"));
+            }
+        </text>)
+)
+}
+
+@using (Html.DevExtreme().NamedTemplate("resTemplate"))
+{
+    @(Html.DevExtreme().TreeView()
+    .ID("reasonTreeViewSingle2")
+    .DataSource(new JS(@"component.getDataSource()"))
+    .KeyExpr("HierarchyId")
+    .DisplayExpr("CategoryName")
+    .ParentIdExpr("ParentHierarchy")
+    .ExpandNodesRecursive(true)
+    .DataStructure(TreeViewDataStructure.Plain)
+    .SelectionMode(NavSelectionMode.Single)
+    .SelectNodesRecursive(false)
+    .SelectByClick(true)
+    .SearchEnabled(true)
+    .Height(300)
+    .OnItemClick(
+        @<text>
+            function(args) {
+                component.close();
+            }
+        </text>
+    )
+    .OnItemSelectionChanged(
+        @<text>
+            function(args) {
+                component.option("value", args.component.getSelectedNodeKeys());
+            }
+        </text>
+    )
+    .OnContentReady(
+        @<text>
+            function(args) {
+                Reason.syncTreeViewSelection(args.component, component.option("value"));
+            }
+        </text>
+    )
+)
+}
+    
+
+@using (Html.DevExtreme().NamedTemplate("sbPTFilterTicketStateTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbTicketState")
+    .DataSource(d => d.RemoteController()
+    .Key("id")
+    .LoadUrl(Url.Page(null, "TicketStateData"))
+    )
+    .DeferRendering(false)
+    .ValueExpr("id")
+    .DisplayExpr("ticketStateDescription")
+    .ShowClearButton(true)
+    .DeferRendering(false)
+)
+
+}
+
+@using (Html.DevExtreme().NamedTemplate("dpPTFilterLocationTemplate"))
+{
+    @(Html.DevExtreme()
+    .DropDownBox()
+    .ID("dropDownLocation2")
+    .DataSource(d => d.RemoteController()
+    .Key("HierarchyId")
+    .LoadUrl(Url.Page(null, "LocationData"))
+    )
+    .DeferRendering(false)
+    .ValueExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .DropDownOptions(o => o.Height(350))
+    .Placeholder("Mahal Seçiniz..")
+    .ShowClearButton(true)
+    .OnValueChanged("Location.treeBox_valueChanged")
+    .ContentTemplate(
+        @<text>
+            @await Html.PartialAsync("_LocationTreeViewMultiple")
+        </text>
+    )
+)
+
+}
+
+@using (Html.DevExtreme().NamedTemplate("sbPTFilterPriorityTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbPriority")
+    .DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+    .ValueExpr("ID")
+    .DisplayExpr("Text")
+    .ShowClearButton(true)
+)
+}
+
+@using (Html.DevExtreme().NamedTemplate("sbPTFilterTicketUserTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbTicketUser")
+    .DataSource(d => d.RemoteController()
+    .Key("Id")
+    .LoadUrl(Url.Page(null, "UserData"))
+    )
+
+    .DeferRendering(false)
+    .ValueExpr("Id")
+    .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+    .ShowClearButton(true)
+    .SearchEnabled(true)
+    .SearchExpr("FirstName", "LastName", "UserName", "Email")
+)
+}
+
+<script type="text/javascript">
+    var data;
+    $("#dateDayStartedTime").dxDateBox("instance").option("isValid", true);
+    $("#dateDayEndedTime").dxDateBox("instance").option("isValid", true);
+    //row u editlemek istediğimizde
+    function onEditingStart(e) {
+
+        data = e.data;
+    }
+    //yeni bir row eklemek istediğimizde
+    function OnInitNewRow(e) {
+
+        data = null;
+    }
+
+    function selection_changed(selectedItems) {
+    }
+
+    function valueChangeUser(selectedItems) {
+    }
+
+    function onValueChangedOption(e) {
+
+
+        if (e.value == 1) {
+            var a = $("#sbPTOption").parent().parent().parent().parent();
+            $("#Option2").remove();
+            $("#Option3").remove();
+            $("#Option4").remove();
+            a.after(`<div id="Option1" >
+            <div style="margin-top: 10px; margin-bottom: 10px; margin-left: 40px; margin-right: 40px; border-right: 1px solid #000; border-top: 1px solid #000; border-bottom: 1px solid #000; border-left: 1px solid #000; padding-left: 5px; padding-top: 5px; padding-bottom: 5px; border-radius: 15px;">
+                <div class="form-check">
+                    <input class='form-check-input' type='radio' id='gunluk1' name='radioGroup' ><label for='gunluk1'>
+                        Her
+                    </label>
+                </div>
+                <div>
+                    <input  style="display: initial;" class="form-control col-md-6" type='number' id='numberGunluk' name='numberGunluk' value='0'>
+                    <label>günde bir.</label>
+                </div>
+            </div>
+                <hr>
+
+            <div style="margin-top: 10px; margin-bottom: 10px; margin-left: 40px; margin-right: 40px; border-right: 1px solid #000; border-top: 1px solid #000; border-bottom: 1px solid #000; border-left: 1px solid #000; padding-left: 5px; padding-top: 5px; padding-bottom: 5px; border-radius: 15px;">
+                <div class="form-check">
+                    <input class='form-check-input' type='radio' id='gunluk2' name='radioGroup' ><label for='age1'>Haftaiçi Her gün</label>
+                </div>
+            </div>
+
+</div>`)
+        }
+        if (e.value == 2) {
+            var a = $("#sbPTOption").parent().parent().parent().parent();
+            $("#Option1").remove();
+            $("#Option3").remove();
+            $("#Option4").remove();
+            a.after(`
+<div id="Option2" style="margin-top: 10px; margin-bottom: 10px; margin-left: 40px; margin-right: 40px; border-right: 1px solid #000; border-top: 1px solid #000; border-bottom: 1px solid #000; border-left: 1px solid #000; padding-left: 5px; padding-top: 5px; padding-bottom: 5px; border-radius: 15px;">
+    <div class="form-check">
+        <input class="form-check-input" type="radio" id="haftalik1" name="haftalik1" value="3"><label for="haftalik1">
+            Her
+        </label>
+    </div>
+    <div>
+        <input class="form-control col-md-6" type="number" id="haftalik1Number" name="haftalik1Number" value="0" style="display: initial;">
+        <label>haftada şu günlerde tekrarla.</label>
+    </div>
+
+    <br>
+    <input type="checkbox" id="pazartesi" name="pazartesi" value="0">
+    <label for="vehicle1"> Pazartesi</label>
+
+    <input type="checkbox" id="sali" name="sali" value="1"><label for="vehicle1"> Salı</label>
+
+    <input type="checkbox" id="carsamba" name="carsamba" value="2"><label for="vehicle1"> Çarşamba</label>
+
+    <input type="checkbox" id="persembe" name="persembe" value="3"><label for="vehicle1"> Perşembe</label>
+
+    <input type="checkbox" id="cuma" name="cuma" value="4"><label for="vehicle1"> Cuma</label>
+
+    <input type="checkbox" id="cumartesi" name="cumartesi" value="5"><label for="vehicle1"> Cumartesi</label>
+
+    <input type="checkbox" id="pazar" name="pazar" value="6"><label for="vehicle1"> Pazar</label>
+
+</div>
+
+
+
+`)
+        }
+
+        if (e.value == 3) {
+            var a = $("#sbPTOption").parent().parent().parent().parent();
+            $("#Option2").remove();
+            $("#Option1").remove();
+            $("#Option4").remove();
+            a.after(`<div id="Option3">
+    <div style="margin-top: 10px; margin-bottom: 10px; margin-left: 40px; margin-right: 40px; border-right: 1px solid #000; border-top: 1px solid #000; border-bottom: 1px solid #000; border-left: 1px solid #000; padding-left: 5px; padding-top: 5px; padding-bottom: 5px; border-radius: 15px;">
+        <div class="form-check">
+            <input class="form-check-input" type="radio" id="aylik1" name="radioGroup" value="3"><label for="aylik1">
+                Her
+            </label>
+        </div>
+        <div>
+            <input class="form-control col-md-6" type="number" id="aylik1Number1" name="aylik1Number" value="0" style="display: initial;"><label>ayda bir,ayın</label>
+        </div>
+        <div style="margin-top: 10px;">
+            <input class="form-control col-md-6" type="number" id="aylik1Number2" name="aylik1Number2" value="0" style="display: initial;">
+            <label>günü</label>
+        </div>
+
+    </div>
+    <br>
+    <div style="margin-top: 10px; margin-bottom: 10px; margin-left: 40px; margin-right: 40px; border-right: 1px solid #000; border-top: 1px solid #000; border-bottom: 1px solid #000; border-left: 1px solid #000; padding-left: 5px; padding-top: 5px; padding-bottom: 5px; border-radius: 15px;">
+        <div class="form-check" style="padding-left: 0px;">
+            <input type="radio" id="aylik2" name="radioGroup" value="3"><label for="aylik2">
+                Her
+            </label>
+        </div>
+
+        <div>
+            <input class="form-control col-md-6" type="number" id="aylik2Number1" name="aylik2Number1" value="0" style="
+    display: initial;"><label>ayda bir,</label>
+        </div>
+        <div style="margin-top: 10px;">
+            <select class="form-control col-md-6" name="weekNumber" id="weekNumber" style="display: initial;">
+                <option value="0">1</option>
+                <option value="1">2</option>
+                <option value="2">3</option>
+                <option value="3">4</option>
+                <option value="4">5</option>
+
+            </select><label>.</label>
+        </div>
+
+        <div style="margin-top: 10px;">
+            <select class="form-control col-md-6" name="weekName" id="weekName" style="display: initial;">
+                <option value="0">Pazartesi</option>
+                <option value="1">Salı</option>
+                <option value="2">Çarşamba</option>
+                <option value="3">Perşembe</option>
+                <option value="4">Cuma</option>
+                <option value="5">Cumartesi</option>
+                <option value="6">Pazar</option>
+            </select>
+            <label>günü</label>
+        </div>
+    </div>
+</div>
+`)
+        }
+
+        if (e.value == 4) {
+            var a = $("#sbPTOption").parent().parent().parent().parent();
+            $("#Option2").remove();
+            $("#Option3").remove();
+            $("#Option1").remove();
+            a.after(`
+
+<div id="Option4">
+    <div style="margin-top: 10px; margin-bottom: 10px; margin-left: 40px; margin-right: 40px; border-right: 1px solid #000; border-top: 1px solid #000; border-bottom: 1px solid #000; border-left: 1px solid #000; padding-left: 5px; padding-top: 5px; padding-bottom: 5px; border-radius: 15px;">
+        <div class="form-check">
+            <input class="form-check-input" type="radio" id="yillik1" name="radioGroup" value="3"><label for="yillik1">
+                Her yıl
+            </label>
+        </div>
+        <div>
+            <select class="form-control col-md-6" name="yearMonth" id="yearMonth" style="display: initial;">
+                <option value="0">Ocak</option>
+                <option value="1">Şubat</option>
+                <option value="2">Mart</option>
+                <option value="3">Nisan</option>
+                <option value="4">Mayıs</option>
+                <option value="5">Haziran</option>
+                <option value="6">Temmuz</option>
+                <option value="7">Ağustos</option>
+                <option value="8">Eylül</option>
+                <option value="9">Ekim</option>
+                <option value="10">Kasım</option>
+                <option value="11">Aralık</option>
+            </select><label>ayının</label>
+        </div>
+
+
+        <div style="margin-top: 10px;">
+            <input class="form-control col-md-6" type="number" id="yillik1number1" name="yillik1number1" value="0" style="display: initial;">
+            <label>.günü</label>
+        </div>
+    </div>
+    <hr>
+    <div style="margin-top: 10px; margin-bottom: 10px; margin-left: 40px; margin-right: 40px; border-right: 1px solid #000; border-top: 1px solid #000; border-bottom: 1px solid #000; border-left: 1px solid #000; padding-left: 5px; padding-top: 5px; padding-bottom: 5px; border-radius: 15px;">
+        <div class="form-check" style="padding-left: 0px;">
+            <input type="radio" id="yillik2" name="radioGroup" value="3"><label for="yillik2">
+                Her yıl
+            </label>
+        </div>
+
+        <div>
+            <select class="form-control col-md-6" name="yearMonth2" id="yearMonth2" style="display: initial;">
+                <option value="0">Ocak</option>
+                <option value="1">Şubat</option>
+                <option value="2">Mart</option>
+                <option value="3">Nisan</option>
+                <option value="4">Mayıs</option>
+                <option value="5">Haziran</option>
+                <option value="6">Temmuz</option>
+                <option value="7">Ağustos</option>
+                <option value="8">Eylül</option>
+                <option value="9">Ekim</option>
+                <option value="10">Kasım</option>
+                <option value="11">Aralık</option>
+            </select>
+            <label>ayının</label>
+        </div>
+
+
+        <div style="margin-top: 10px;">
+            <select class="form-control col-md-6" name="yillikNumber" id="yillikNumber" style="display: initial;">
+                <option value="0">1</option>
+                <option value="1">2</option>
+                <option value="2">3</option>
+                <option value="3">4</option>
+                <option value="4">5</option>
+            </select><label>.</label>
+
+        </div>
+        <div style="margin-top: 10px;">
+            <select class="form-control col-md-6" name="weekYil" id="weekYil" style="display: initial;">
+                <option value="0">Pazartesi</option>
+                <option value="1">Salı</option>
+                <option value="2">Çarşamba</option>
+                <option value="3">Perşembe</option>
+                <option value="4">Cuma</option>
+                <option value="5">Cumartesi</option>
+                <option value="6">Pazar</option>
+            </select>
+            <label>günü</label>
+        </div>
+
+
+    </div>
+</div>
+
+
+
+                `)
+        }
+    }
+
+    function onValueChangedIsTime(e) {
+        if (e.value == true) {
+            $("#dateDayStartedTime").dxDateBox("instance").option("visible", true);
+            $("#dateDayEndedTime").dxDateBox("instance").option("visible", true);
+            $("#dateDayStartedTime").dxDateBox("instance").option("isValid", false);
+            $("#dateDayEndedTime").dxDateBox("instance").option("isValid", false);
+        }
+        else {
+            $("#dateDayStartedTime").dxDateBox("instance").option("visible", false);
+            $("#dateDayEndedTime").dxDateBox("instance").option("visible", false);
+            
+        }
+    }
+
+    function onToolbarPreparing(e) {
+        e.toolbarOptions.items[0].showText = "always";
+        e.toolbarOptions.items[0].options.text = "Planlı iş Emri ";
+        e.toolbarOptions.items[0].options.icon = "plus";
+        e.toolbarOptions.items[0].options.elementAttr = { class: "btn-class-dias" }
+    }
+
+    //title açıldığında
+    function setPopupTitle(e) {
+        
+        $("#dateDayStartedTime").dxDateBox("instance").option("visible", false);
+        $("#dateDayEndedTime").dxDateBox("instance").option("visible", false);
+        if (data != null) {            
+            $("#popupContainer").dxPopup({
+                title: "Ticket Düzenle",
+            });
+
+            //labelText = `Ticket: #${data.TicketViewObj.id}`;
+            //data.TicketViewObj.responsibleUserId = "1";
+            //$("#dropDownReasonSingle").dxDropDownBox("instance").option("value", String(data.Ticket.TicketReasonId));
+            //$("#dropDownReasonSingle").dxDropDownBox("instance").option("disabled", true);
+
+            //$("#dropDownLocationSingle").dxDropDownBox("instance").option("value", data.Location.Id);
+            //$("#dropDownLocationSingle").dxDropDownBox("instance").option("disabled", true);
+
+            //$("#sbTicketPriority").dxSelectBox("instance").option("disabled", true);
+
+            //$("#sbTicketOwner").dxSelectBox("instance").option("value", data.Ticket.AddedByUserId);
+            //$("#sbTicketOwner").dxSelectBox("instance").option("disabled", true);
+
+            //$("#sbAsgGroup").dxSelectBox("instance").option("value", data.Ticket.TickedAssignedAssignmentGroupId);
+            //$("#sbAsgGroup").dxSelectBox("instance").option("disabled", true);
+
+            //$("#sbAsgGroupEmp").dxSelectBox("instance").option("value", data.Ticket.TicketAssignedUserId);
+            //$("#sbAsgGroupEmp").dxSelectBox("instance").option("disabled", true);
+
+            //$("#dateTicket").dxDateBox("instance").option("value", data.Ticket.TicketOpenedTime);
+            //$("#dateTicket").dxDateBox("instance").option("disabled", true);
+
+            //$("#textAreaDescription").dxTextArea("instance").option("value", data.Ticket.TicketDescription);
+            //$("#textAreaDescription").dxTextArea("instance").option("disabled", true);
+        }
+    }
+
+
+
+    //modele gönderme işlemleri
+    function beforeSend(type, e) {
+        if (type == "load") return;
+
+
+
+        var chpValue = $("#chPTisTime").dxCheckBox("instance").option("value");
+        if (chpValue == true) {
+            var valueDateStart = $("#dateDayStartedTime").dxDateBox("instance").option("value");
+            var valueDateEnd = $("#dateDayEndedTime").dxDateBox("instance").option("value");
+            if (valueDateStart == null || valueDateEnd == null) {
+                return;
+            }
+        }
+
+        var numberGunluk = 0;
+        var gunluk1 = null;
+        var haftalik1Number = 0;
+        var haftalar = [];
+        var aylik1Number1 = 0;
+        var aylik1Number2 = 0;
+        var aylik2Number1 = 0;
+        var weekNumber = 0;
+        var weekName = null;
+        var yearMonth = null;
+        var yillik1number1 = 0;
+        var yearMonth2 = null;
+        var yillikNumber = 0;
+        var weekYil = null;
+
+        var optionValue = $("#sbPTOption").dxSelectBox("instance").option("value");
+        if (optionValue == 1) {
+            gunluk1 = $("#gunluk1").prop('checked');
+            if (gunluk1 == true) {
+                numberGunluk = $("#numberGunluk").val();
+            }
+        }
+
+        if (optionValue == 2) {
+
+            haftalik1Number = $("#haftalik1Number").val();
+            if ($("#pazartesi").prop('checked') == true) {
+                var pazartesi = $("#pazartesi").val();
+                haftalar.push(pazartesi);
+            }
+            if ($("#sali").prop('checked') == true) {
+                var sali = $("#sali").val();
+                haftalar.push(sali);
+            }
+            if ($("#carsamba").prop('checked') == true) {
+                var carsamba = $("#carsamba").val();
+                haftalar.push(carsamba);
+            }
+
+            if ($("#persembe").prop('checked') == true) {
+                var persembe = $("#persembe").val();
+                haftalar.push(persembe);
+            }
+
+            if ($("#cuma").prop('checked') == true) {
+                var cuma = $("#cuma").val();
+                haftalar.push(cuma);
+            }
+
+            if ($("#cumartesi").prop('checked') == true) {
+                var cumartesi = $("#cumartesi").val();
+                haftalar.push(cumartesi);
+            }
+
+            if ($("#pazar").prop('checked') == true) {
+                var pazar = $("#pazar").val();
+                haftalar.push(pazar);
+            }
+        }
+
+        if (optionValue == 3) {
+            if ($("#aylik1").prop('checked') == true) {
+                aylik1Number1 = $("#aylik1Number1").val();
+                aylik1Number2 = $("#aylik1Number2").val();
+            }
+
+            if ($("#aylik2").prop('checked') == true) {
+                aylik2Number1 = $("#aylik2Number1").val();
+                weekNumber = $("#weekNumber").val();
+                weekName = $("#weekName").val();
+
+            }
+
+        }
+
+        if (optionValue == 4) {
+            if ($("#yillik1").prop('checked') == true) {
+                yearMonth = $("#yearMonth").val();
+                yillik1number1 = $("#yillik1number1").val();
+            }
+
+            if ($("#yillik2").prop('checked') == true) {
+                yearMonth2 = $("#yearMonth2").val();
+                yillikNumber = $("#yillikNumber").val();
+                weekYil = $("#weekYil").val();
+
+            }
+
+        }
+        var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+        var formData = new FormData();
+
+        formData.append("Description", $("#textAreaDescription").dxTextArea("instance").option("value"));
+        formData.append("TicketReasonId", $("#dropDownReasonSingle2").dxDropDownBox("instance").option("value"));
+        formData.append("LocationId", 18);
+        formData.append("Option", $("#sbPTOption").dxSelectBox("instance").option("value"));
+        formData.append("PeriodicName", $("#textPeriodicName").dxTextBox("instance").option("value"));
+        formData.append("StartDateTime", $("#dateStartPT").dxDateBox("instance").option("value"));
+        formData.append("EndDateTime", $("#dateEndPT").dxDateBox("instance").option("value"));
+        formData.append("TicketPriority", $("#sbTicketPriority").dxSelectBox("instance").option("value"));
+        formData.append("TicketUserId", 1);
+        formData.append("DayNumber", numberGunluk);
+        formData.append("WeekPeriod", haftalik1Number);
+        formData.append("Weeks", haftalar);
+        formData.append("MonthADayOptionOne", aylik1Number1);
+        formData.append("MonthDay", aylik1Number2);
+        formData.append("MonthADayOptionsTwo", aylik2Number1);
+        formData.append("WeekDayinMonth", weekName);
+        formData.append("WeekNumberinMonth", weekNumber);
+        formData.append("YearMonthOptionOne", yearMonth);
+        formData.append("YearMonthDay", yillik1number1);
+        formData.append("YearMonthOptionTwo", yearMonth2);
+        formData.append("YearMonthWeekNumber", yillikNumber);
+        formData.append("YearMonthWeekName", weekYil);
+        formData.append("AddedByUserId", 1);
+        
+        e.data = formData;
+        e.headers = ajaxHeader;
+        e.async = true;
+        e.contentType = false;
+        e.processData = false;
+    }
+
+
+    //todo: filtreleme için kullanıcılacak
+
+    function syncTreeViewSelection(treeView, value) {
+        //if (!value) {
+        //    treeView.unselectAll();
+        //} else {
+        //    treeView.selectItem(value);
+        //}
+    }
+    //todo: filtreleme için kullanıcılacak
+    function treeBox_valueChangedReason(e) {
+        //if (e.component.content() == null)
+        //    return;
+        //var $treeView = e.component.content().find(".dx-treeview");
+        //if ($treeView.length) {
+        //    syncTreeViewSelection($treeView.dxTreeView("instance"), e.value);
+        //}
+        //$("#sbAsgGroup").dxSelectBox("instance").option("value", null);
+        //$("#sbAsgGroupEmp").dxSelectBox("instance").option("value", null);
+        //if (e.value) {
+        //    if (e.value[0]) {
+        //        var reasonValue = $("#ticketForm").dxForm("instance").option("formData").TicketViewObj.reasonCategory;
+        //        var asgGroup = $("#sbAsgGroup").dxSelectBox("instance").getDataSource().items();
+        //        var itemAsgGroup = [];
+        //        //$("#sbAsgGroup").dxSelectBox("instance").getDataSource()
+        //        asgGroup.filter(function (e2) {
+        //            if (e2.reasonId == reasonValue[0]) {
+        //                itemAsgGroup.push(e2);
+        //            }
+        //        })
+        //        if (itemAsgGroup.length != 0) {
+        //            $("#sbAsgGroup").dxSelectBox("instance").option("items", itemAsgGroup);
+        //        }
+        //        else {
+        //            $("#sbAsgGroup").dxSelectBox("instance").getDataSource().reload();
+        //        }
+        //    }
+        //}
+        //else {
+        //    $("#sbAsgGroup").dxSelectBox("instance").getDataSource().filter(null);
+        //    $("#sbAsgGroup").dxSelectBox("instance").getDataSource().reload();
+        //}
+    }
+</script>
+
+<style>
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+    .accordion {
+        padding: 5px;
+    }
+
+    #accordion h1,
+    #accordion p {
+        margin: 0;
+    }
+
+    #accordion h1 {
+        font-size: 20px;
+    }
+</style>

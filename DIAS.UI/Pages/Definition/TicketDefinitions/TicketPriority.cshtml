@@ -1,0 +1,349 @@
+﻿@page
+@using DiasShared.Data.EF_Data.DiasFacilityManagement.SqlServer.DataTransferObjects.Development.Shared.Standard
+@using static DiasShared.Enums.Standart.TicketEnums
+@model DIAS.UI.Pages.Definition.TicketDefinitions.TicketPriorityModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@{
+}
+<script src="https://unpkg.com/devextreme-aspnet-data/js/dx.aspnet.data.js"></script>
+<script src="~/js/pages/ticket/tickets.js"></script>
+<script src="~/js/pages/shared/reason.js"></script>
+<script src="~/js/pages/shared/location.js"></script>
+
+<div id="accordion">
+    <div class="card">
+        <div class="card-header" id="headingOne">
+            <h5 class="mb-0">
+                <button class="btn btn-link" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                    <i style="margin-right:5px" class="fa fa-filter" aria-hidden="true"></i>Filtre
+                </button>
+            </h5>
+        </div>
+
+        <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">
+            <div class="card-body">
+                @(Html.DevExtreme().Form().ID("#frmTicket").ColCount(3).ShowColonAfterLabel(false).Items(items =>
+            {
+            items.AddSimple().ColSpan(2).Label(l => l.Text("Vaka Nedeni"))
+                .Template(@<text> @await Html.PartialAsync("../Shared/_ReasonTemplate")</text>);
+
+        items.AddSimple().ColSpan(2).Label(l => l.Text("Ticket Durumu"))
+            .Template(new TemplateName("selectBoxFilterTicketStateTemplate"));
+
+            //items.AddSimple().ColSpan(2).Label(l => l.Text("Mahal"))
+            //.Template(new TemplateName("dropDownFilterLocationTemplate"));
+
+            items.AddSimple().ColSpan(2).Label(l => l.Text("Öncelik"))
+            .Template(new TemplateName("selectBoxFilterPriorityTemplate"));
+
+        items.AddSimple().ColSpan(2).Label(l => l.Text("Sorumlu Kişi"))
+            .Template(new TemplateName("selectBoxFilterTicketUserTemplate"));
+
+        items.AddSimple().Label(l => l.Text("Açıklama")).Editor(e => e.TextBox().ID("textDescription").ShowClearButton(true));
+        items.AddEmpty().ColSpan(2);
+        items.AddButton()
+                .ButtonOptions(a => a.Text("Ara")
+                .Height(40)
+                .Width(180)
+                .ID("ticketSearch")
+                .Icon("fas fa-search")
+                .Type(ButtonType.Default)
+                .OnClick("Tickets.btn_ticketFindClick")
+                .UseSubmitBehavior(true)
+                .Template(@<text>
+                                <div id="widget"></div>
+	                            <i class="dx-icon fas fa-search"></i>
+                                <span class="dx-button-text"><%- text %></span>
+                            </text>)
+                            .Hint("Kayıtları Filtrele"))
+                        .HorizontalAlignment(HorizontalAlignment.Right);
+                }))
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header" id="headingTwo">
+            <h5 class="mb-0">
+                <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                    <i style="margin-right:5px" class="fas fa-ticket-alt"></i>Liste
+                </button>
+            </h5>
+        </div>
+        <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+            <div class="card-body">
+                <div class="btn-group">
+                    @(Html.DevExtreme().Button().ID("btn_refresh")
+                        .Hint("Yenile")
+                        .Template(
+                            @<text>
+	                <i class="dx-icon fas fa-redo">
+                    </i>
+                    <span class="dx-button-text" id="timer"></span>
+                            </text>)
+                        .Type(ButtonType.Normal)
+                        .OnClick("Tickets.btn_refreshGridClick")
+                    )
+                </div>
+                @(Html.DevExtreme().DataGrid<TicketPriorityDto>()
+                            .ID("gridTicket")
+                            .DataSource(ds => ds.RemoteController()
+                            .OnBeforeSend("beforeSend")
+                            .Key("Id")
+                            .LoadUrl(Url.Page(null, "GridData"))
+                            .InsertUrl(Url.Page(null, "GridRow"))
+                            .UpdateUrl(Url.Page(null, "GridRowUpdate"))
+                            .DeleteUrl(Url.Page(null, "GridRowDelete"))
+                        )
+                            .ColumnChooser(c => c.Enabled(true).AllowSearch(true).Mode(GridColumnChooserMode.Select))
+                            .HeaderFilter(o=>o.AllowSearch(true))
+                            .FilterRow(o => o.Visible(true))
+                            .Selection(s => s.Mode(SelectionMode.Single))
+                            .OnSelectionChanged("onSelectionChangedTicketPriority")
+                            .OnToolbarPreparing("onToolbarPreparing")
+                        .RemoteOperations(true)
+                            .ShowBorders(true)
+                            .Paging(p => p.Enabled(false))
+                        .Editing(e => e.Mode(GridEditMode.Popup)
+                                .AllowUpdating(true)
+                                .AllowDeleting(true)
+                                .AllowAdding(true)
+                                .EditColumnName("Düzenle")
+                                .SelectTextOnEditStart(true)
+                                .StartEditAction(GridStartEditAction.DblClick)
+                                .Popup(p => p
+                                    .Title("Yeni Ticket Öncelik Durumu Ekleme")
+                                    .ID("popupContainer")
+                                    .ShowTitle(true)
+                                    .Width(700)
+                                    .Height(525)
+                                    .OnShowing("setPopupTitle")
+                                    .ShowCloseButton(true)
+                                )
+                            .Form(f => f.Items(items =>
+                            {
+                                items.AddGroup()
+                                    .Items(groupItems =>
+                                    {
+                                        groupItems.AddTabbed()
+                    .TabPanelOptions(o =>
+                    {
+                        o.DeferRendering(false);
+                        o.AnimationEnabled(true);
+                        o.ID("ticketPriorityTab");
+                        o.Width(650);
+                        o.AnimationEnabled(true);
+                        o.ShowNavButtons(true);
+                        o.Height("100%");
+                    })
+                    .Tabs(tabItems =>
+                    {
+                        tabItems.Add().Icon("fas fa-save")
+                    .Title("İş Emri Öncelik Durumu")
+                    .Items(tabItem =>
+                    {
+                        tabItem.AddSimpleFor(m => m.Name)
+        .Label(l => l.Text("Açıklama").Visible(true)).Editor(e => e.TextBox().ID("priorityName")
+        .Placeholder("Açıklama giriniz...").Height(50))
+                        .ValidationRules(v =>
+                        {
+                            v.AddRequired().Message("Açıklama Alanı Boş Olamaz");
+                        });
+                    });
+
+                    });
+                                    });
+                                    }).ID("ticketPriorityForm")))
+        .Columns(columns =>
+        {
+        columns.Add()
+           .Caption("")
+           .AllowSearch(false)
+           .AllowSorting(false)
+           .Alignment(HorizontalAlignment.Center)
+           .Width(41);
+        columns.AddFor(m => m.Name).Caption("İş Emri Öncelik").AllowEditing(true);
+        })
+        .OnEditingStart(@<text> function(e) {onEditingStart(e) } </text>)
+        .OnInitNewRow(@<text> function(e) { OnInitNewRow(e); } </text>)
+
+    )
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+@using (Html.DevExtreme().NamedTemplate("selectBoxFilterTicketStateTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbTicketState")
+    .DataSource(d => d.RemoteController()
+    .Key("Id")
+    .LoadUrl(Url.Page(null, "TicketStateData"))
+    )
+    .DeferRendering(false)
+    .ValueExpr("Id")
+    .DisplayExpr("StateDescription")
+    .ShowClearButton(true)
+    .DeferRendering(false)
+)
+
+}
+
+@*@using (Html.DevExtreme().NamedTemplate("dropDownFilterLocationTemplate"))
+{
+    @(Html.DevExtreme()
+    .DropDownBox()
+    .ID("dropDownLocation")
+    .DataSource(d => d.RemoteController()
+    .Key("HierarchyId")
+    .LoadUrl(Url.Page(null, "LocationData"))
+    )
+    .DeferRendering(false)
+    .ValueExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .DropDownOptions(o => o.Height(350))
+    .Placeholder("Lütfen Seçiniz..")
+    .ShowClearButton(true)
+    .OnValueChanged("Location.treeBox_valueChanged")
+    .ContentTemplate(
+        @<text>
+            @await Html.PartialAsync("_LocationTreeViewMultiple")
+        </text>
+    )
+)
+
+}*@
+
+@using (Html.DevExtreme().NamedTemplate("selectBoxFilterPriorityTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbPriority")
+    .DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+    .ValueExpr("ID")
+    .DisplayExpr("Text")
+    .ShowClearButton(true)
+)
+}
+
+@using (Html.DevExtreme().NamedTemplate("selectBoxFilterTicketUserTemplate"))
+{
+    @(Html.DevExtreme()
+    .SelectBox()
+    .ID("sbTicketUser")
+    .DataSource(d => d.RemoteController()
+    .Key("Id")
+    .LoadUrl(Url.Page(null, "UserData"))
+    ).DataSourceOptions(o => o.Paginate(true).PageSize(20))
+    .DeferRendering(true)
+    .ValueExpr("Id")
+    .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+    .ShowClearButton(true)
+    .SearchEnabled(true)
+    .SearchExpr("FirstName", "LastName", "UserName", "Email")
+)
+}
+
+
+<script type="text/javascript">
+    var data;
+    let attachmentFile;
+    let noteFile;
+
+    //row u editlemek istediğimizde
+    function onEditingStart(e) {
+        data = e.data;
+    }
+    //yeni bir row eklemek istediğimizde
+    function OnInitNewRow(e) {
+
+        data = null;
+    }
+
+    function onToolbarPreparing(e) {
+        e.toolbarOptions.items[0].showText = "always";
+        e.toolbarOptions.items[0].options.text = "İş Emri Öncelik Durumu Ekle ";
+        e.toolbarOptions.items[0].options.icon = "plus";
+        e.toolbarOptions.items[0].options.elementAttr = { class: "btn-class-dias" }
+
+    }
+
+
+    //popup açıldığında
+    function setPopupTitle(e) {
+
+        if (data != null) {
+            $("#popupContainer").dxPopup({
+                title: "İş Emri Durum Düzenle",
+            });
+            $("#priorityName").dxTextBox("instance").option("value", data.Name);
+        }
+    }
+
+
+    function beforeSend(type, e) {
+
+        if (type == "load") return;
+
+        if (type == "update") {
+            var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+            var PriorityName = $("#priorityName").dxTextBox("instance").option("value");
+
+        var formData = new FormData();
+        formData.append("Id", data.Id);
+        formData.append("AddedTime", data.AddedTime);
+        formData.append("IsDeleted", data.IsDeleted);
+        formData.append("IsActive", data.IsActive);
+            formData.append("Name", PriorityName);
+        formData.append("AddedByUserId", 1);
+        e.data = formData;
+        e.contentType = false;
+        e.processData = false;
+        e.headers = ajaxHeader;
+        }
+
+        if (type == "insert") {
+            var ajaxHeader = {};
+        ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+
+            var PriorityName = $("#priorityName").dxTextBox("instance").option("value");
+
+        var formData = new FormData();
+            formData.append("Name", PriorityName);
+        formData.append("AddedByUserId", 1);
+
+        e.data = formData;
+        e.contentType = false;
+        e.processData = false;
+        e.headers = ajaxHeader;
+        }
+        if (type == "delete") {
+            var Id = e.data.key;
+            var ajaxHeader = {};
+            ajaxHeader["RequestVerificationToken"] = "@Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken";
+            var formData = new FormData();
+            formData.append("Id", Id);
+            e.data = formData;
+            e.contentType = false;
+            e.processData = false;
+            e.headers = ajaxHeader;
+        }
+    }
+
+    function onSelectionChangedTicketPriority(data) {
+        let rowData = data.selectedRowsData[0];
+        if (!rowData)
+            return;
+        dataRow = rowData;
+    }
+</script>
+<style>
+    .btn-class-dias:hover {
+        background-color: #5cb85c;
+    }
+</style>

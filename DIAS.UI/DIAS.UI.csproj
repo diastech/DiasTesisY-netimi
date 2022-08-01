@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup Label="Globals">
+      <SccProjectName>SAK</SccProjectName>
+      <SccProvider>SAK</SccProvider>
+      <SccAuxPath>SAK</SccAuxPath>
+      <SccLocalPath>SAK</SccLocalPath>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <TargetFramework>net5.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+    <PackageReference Include="AspNetCoreHero.ToastNotification" Version="1.1.0" />
+    <PackageReference Include="BuildBundlerMinifier" Version="3.2.449" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="5.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="5.0.13" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="5.0.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\DiasProjectShared\DiasShared.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Extensions\" />
+      <Folder Include="Pages\Environment\Live\" />
+      <Folder Include="Pages\TicketWrapper\" />
+      <Folder Include="SampleData\" />
+    </ItemGroup>
+
+    <ProjectExtensions><VisualStudio><UserProperties TemplateFeatures="NETCORE" /></VisualStudio></ProjectExtensions>
+
+</Project>

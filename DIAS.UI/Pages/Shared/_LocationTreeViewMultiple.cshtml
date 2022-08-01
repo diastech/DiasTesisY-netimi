@@ -1,0 +1,51 @@
+﻿@(Html.DevExtreme().TreeView()
+    .ID("locationTreeViewMultiple")
+    .DataSource(new JS(@"component.getDataSource()"))
+    .KeyExpr("HierarchyId")
+    .DisplayExpr("LocationName")
+    .ParentIdExpr("ParentHierarchy")
+    .DataStructure(TreeViewDataStructure.Plain)
+    .SelectionMode(NavSelectionMode.Multiple)
+    .ShowCheckBoxesMode(TreeViewCheckBoxMode.Normal)
+    .SelectNodesRecursive(false)
+    //.SelectedExpr("sadik")
+    .SelectByClick(true)
+    .Height(300)
+    .SearchEnabled(true)
+    .SearchEditorOptions(o => o.Placeholder("Mahal Ara"))
+    .SearchTimeout(500)
+    .OnItemClick(
+        @<text>
+            function(args) {                
+                component.close();
+            }
+        </text>
+    )
+    .OnItemSelectionChanged("OnItemSelectionChangedLocationTm")
+    @*.OnItemSelectionChanged(
+        @<text>
+            function(args) {
+                console.log(component);
+                component.option("value", args.component.getSelectedNodeKeys());
+            }
+        </text>)*@
+    .OnContentReady(
+        @<text>
+            function(args) {
+                var mask = new RegExp('^[A-Za-z0-9 ]*$');
+                $("input").regexMask(mask);
+                Location.syncTreeViewSelection(args.component, component.option("value"));
+            }
+        </text>)
+)
+<script type="text/javascript">
+    $.fn.regexMask = function (mask) {
+        $(this).keypress(function (event) {
+            if (!event.charCode) return true;
+            var part1 = this.value.substring(0, this.selectionStart);
+            var part2 = this.value.substring(this.selectionEnd, this.value.length);
+            if (!mask.test(part1 + String.fromCharCode(event.charCode) + part2))
+                return false;
+        });
+    };
+</script>

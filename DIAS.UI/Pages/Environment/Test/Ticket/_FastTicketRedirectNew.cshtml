@@ -1,0 +1,217 @@
+﻿@using static DiasShared.Enums.Standart.TicketEnums
+
+<div class="row">
+    <div class="column">
+        <div class="title"><h3>Bilgiler</h3></div>
+        @(Html.DevExtreme().Form()
+            .ID("frmFastTicket")
+            .ColCount(1)
+            .ShowColonAfterLabel(false)
+            .LabelLocation(FormLabelLocation.Top).
+            Items(items =>
+            {
+                items.AddSimple().Label(l => l.Text("İş Emri Sahibi").Visible(false)).DataField("insertUser").Template(
+                    @<text>
+                        @await Html.PartialAsync("../Shared/_TicketOwnerUserTemplate")
+                    </text>);
+                items.AddSimple().Label(l => l.Text("Telefon").Visible(false))
+                    .DataField("cellNumber")
+                    .Editor(e => e.TextBox().ID("txtCellNumber")
+                    .Mask("(000) 000-0000")
+                    .ReadOnly(true));
+                items.AddSimple().Label(l => l.Text("Açıklama").Visible(false))
+                    .DataField("description")
+                    .Editor(e => e.TextArea().ID("txtDescription")
+                    .Height(300).Placeholder("Açıklama")
+                    .ReadOnly(true));
+            })
+        )
+    </div>
+    <div class="column">
+        <div class="title"><h3>Ekler</h3></div>
+        @(Html.DevExtreme().List().ID("listAttachments")
+            .KeyExpr("id")
+            .ShowSelectionControls(true)
+            .SelectionMode(ListSelectionMode.Multiple)
+            .ItemTemplate(new JS("FastTicketsRedirect.fastTicketAttachmentsTemplate"))
+            .OnSelectionChanged("FastTicketsRedirect.listOnSelectionChanged")
+        )
+    </div>
+    <div class="column">
+        <div class="title"><h3>İş Emri Oluştur</h3></div>
+        @(Html.DevExtreme().Form()
+        .ID("ticketForm")
+        .ShowColonAfterLabel(false)
+        .LabelLocation(FormLabelLocation.Left)
+        .Items(items => {
+            items.AddSimple().Label(l => l.Text("Sebep").Visible(false)).Template(
+                @<text>
+                    @await Html.PartialAsync("../Shared/_ReasonSingle")
+                </text>).ValidationRules(v => {
+                v.AddRequired().Message("Arama sebebi boş geçilemez.");
+            });
+            items.AddSimple().Label(l => l.Text("Mahal").Visible(false)).Template(
+                @<text>
+                    @await Html.PartialAsync("../Shared/_LocationMultiple")
+                </text>).ValidationRules(v => {
+                v.AddRequired().Message("Mahal bilgisi boş geçilemez.");
+            });
+            items.AddSimple().Label(l => l.Text("Öncelik").Visible(false))
+                .Editor(e => e.SelectBox().ID("sbTicketPriority")
+                    .ShowClearButton(true)
+                    .DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+                    .DisplayExpr("Text")
+                    .Placeholder("Öncelik seçiniz.")
+                    .ValueExpr("ID")).ValidationRules(v => {
+                        v.AddRequired().Message("Öncelik boş geçilemez.");
+                    });
+            items.AddSimple().Label(l => l.Text("Ticket Sahibi").Visible(false))
+                .Editor(e => e.SelectBox().ID("sbTicketOwner")
+                    .DataSource(d => d.RemoteController()
+                        .LoadUrl(Url.Page("", "UserData")))
+                    .DeferRendering(false)
+                    .ValueExpr("Id")
+                    .DisplayExpr(new JS("Shared.sbTicketUserDiplayExpr"))
+                    .ShowClearButton(true)
+                    .SearchEnabled(true)
+                    .Placeholder("Bildiren kişi seçiniz.")
+                    .SearchExpr("FirstName", "LastName", "UserName", "Email")).ValidationRules(v => {
+                        v.AddRequired().Message("Bildiren kişi boş geçilemez.");
+                    });
+            items.AddSimple().Label(l => l.Text("Sorumlu Grup").Visible(false)).Template(
+                @<text>
+                    @await Html.PartialAsync("../Shared/_AssignGroupTemplate")
+                </text>)
+                .ValidationRules(v => {
+                    v.AddRequired().Message("Sorumlu Grup bilgisi boş geçilemez.");
+                });
+            items.AddSimple().Label(l => l.Text("Sorumlu Kişi").Visible(false)).Template(
+                @<text>
+                    @await Html.PartialAsync("../Shared/_AsgTicketOwnerUserTemplate")
+                </text>)
+                .ValidationRules(v => {
+                    v.AddRequired().Message("Sorumlu Kişi bilgisi boş geçilemez.");
+                });
+            items.AddSimple().Label(l => l.Text("Tarih").Visible(false))
+                .Editor(e => e.DateBox().ID("dateTicket")
+                    .ShowClearButton(true)
+                    .Type(DateBoxType.DateTime)
+                    .DisplayFormat("dd/MM/yyyy HH:mm:ss")
+                    .Placeholder("Tarih seçiniz.")).ValidationRules(v => {
+                v.AddRequired().Message("Tarih boş geçilemez.");
+            });
+            items.AddSimple().Label(l => l.Text("Açıklama").Visible(false)).Editor(e => e.TextArea().ID("textAreaDescription")
+                .Placeholder("Açıklama giriniz...").Height(150)).ValidationRules(v => {
+                    v.AddRequired().Message("Bu alan boş geçilemez.");
+                    v.AddStringLength().Min(5).Message("Minimum 5 karakter girmelisiniz.");
+                }
+            );
+            items.AddButton()
+                .ButtonOptions(a => a.Text("Kaydet")
+                .Icon("fas fa-save")
+                .Type(ButtonType.Success)
+                .OnClick("FastTicketsRedirect.saveTicket")
+                .UseSubmitBehavior(true)
+                .Width(150)
+                .Hint("Kaydet"))
+                .HorizontalAlignment(HorizontalAlignment.Right);
+            })
+     )
+    </div>
+    <div>
+        @(Html.DevExtreme().DataGrid().ID("gridTicket")
+        .ShowBorders(true)
+        .WordWrapEnabled(true)
+        .Columns(c => {
+            c.Add()
+                .Caption("Ticket ID")
+                .DataField("id")
+                .Visible(false);
+            c.Add()
+               .Caption("")
+               .Alignment(HorizontalAlignment.Center)
+               .CellTemplate(new JS("FastTicketsRedirect.cellTemplate_CurrentStatus"))
+               .Width(35);
+            c.Add()
+              .Caption("Arama Sebebi")
+              .DataField("reasonName")
+              .Width("24%");
+            c.Add()
+                .Caption("İş Emri Durumu")
+                .DataField("ticketStateDescription");
+            c.Add()
+                .Caption("Lokasyon")
+                .DataField("ticketLocations")
+                .Visible(false);
+            c.Add()
+                .Caption("Lokasyon")
+                .DataField("locationName");
+            c.Add()
+                .Caption("Öncelik")
+                .DataField("priority")
+                .Lookup(l => l.DataSource(Html.GetEnumSelectList<PriorityEnum>().Select(i => new { Value = int.Parse(i.Value), Text = i.Text }))
+                    .ValueExpr("ID")
+                    .DisplayExpr("Text"));
+            c.Add()
+                .Caption("Sorumlu Grup")
+                .DataField("asgGroupName");
+            c.Add()
+                .Caption("Sorumlu Kişi")
+                .DataField("responsibleUser");
+            c.Add()
+                .Caption("Açılma Zamanı")
+                .DataField("ticketOpenedTime")
+                .DataType(GridColumnDataType.Date)
+                .Format("dd/MM/yyyy HH:mm:ss")
+                .Alignment(HorizontalAlignment.Center);
+            c.Add()
+                .Caption("Açıklama")
+                .DataField("ticketDescription")
+                .Visible(false);
+        })
+    )
+    </div>
+</div>
+
+<style>
+    .title h3 {
+        font-family: 'Segoe UI Light', 'Helvetica Neue Light', 'Segoe UI', 'Helvetica Neue', 'Trebuchet MS', Verdana;
+        font-weight: 200;
+        font-size: 24px;
+        text-align: center;
+    }
+
+    #gridTicket {
+        padding-left: 10px;
+        padding-right: 20px;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    .column {
+        float: left;
+        width: 33%;
+        padding: 10px;
+    }
+
+    img {
+        height: 25px;
+        width: 25px;
+        display: block;
+    }
+
+    /* Clear floats after the columns */
+    .row:after {
+        content: "";
+        display: table;
+        clear: both;
+    }
+
+    @@media screen and (max-width: 700px) {
+        .column {
+            width: 100%;
+        }
+    }
+</style>
