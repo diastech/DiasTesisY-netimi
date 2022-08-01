@@ -1,1 +1,0 @@
-TicketStatus.TicketStateTransitionSourceTicketStates[0].DestinationTicketState.TicketStateTransitionDestinationTicketStates'.
